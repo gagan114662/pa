@@ -71,5 +71,6 @@ dependencies {
     implementation("com.github.topjohnwu.libsu:nio:$libsuVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("com.squareup.okhttp3:okhttp:5.0.0-alpha.16")
+    implementation("com.squareup.moshi:moshi:1.15.0")
 
 }

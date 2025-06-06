@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">blurr</string>
+    <string name="input_the_task">Input the Task</string>
 </resources>

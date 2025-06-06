@@ -5,7 +5,6 @@ import android.os.*
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import com.example.blurr.service.Finger
-import com.google.ai.client.generativeai.GenerativeModel
 import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.*
 import java.io.File
@@ -19,7 +18,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var logsText: TextView
     private lateinit var showLogsButton: Button
+    private lateinit var inputField: EditText
+    private lateinit var performTaskButton: TextView
     private lateinit var screenshotFile: File
+
     private val handler = Handler(Looper.getMainLooper())
     private val interval: Long = 3000L // 3 seconds
     private val logs = mutableListOf<String>()
@@ -33,9 +35,16 @@ class MainActivity : AppCompatActivity() {
         statusText = findViewById(R.id.statusText)
         logsText = findViewById(R.id.logsText)
         showLogsButton = findViewById(R.id.showLogsButton)
+        inputField = findViewById(R.id.inputField)
+        performTaskButton = findViewById(R.id.performTaskButton)
 
         showLogsButton.setOnClickListener {
             logsText.text = logs.joinToString("\n")
+        }
+
+        performTaskButton.setOnClickListener {
+            val userInput = inputField.text.toString()
+            handleUserInput(userInput)
         }
 
         Shell.getShell()
@@ -50,10 +59,8 @@ class MainActivity : AppCompatActivity() {
         if (hasRoot == true) {
             screenshotFile = File(filesDir, "latest.png")
 
-            // Start periodic task
             handler.post(screenshotAndTapTask)
 
-            // Show previous screenshot if exists
             if (screenshotFile.exists()) {
                 val bitmap = BitmapFactory.decodeFile(screenshotFile.absolutePath)
                 screenshotView.setImageBitmap(bitmap)
@@ -62,9 +69,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val screenshotAndTapTask = object : Runnable {
-
         override fun run() {
-//            takeScreenshot()
             performRandomTap()
             println("App is running")
             handler.postDelayed(this, interval)
@@ -95,29 +100,30 @@ class MainActivity : AppCompatActivity() {
         val timestamp = dateFormat.format(Date())
 
         CoroutineScope(Dispatchers.IO).launch {
-//            Shell.cmd("input tap $randomX $randomY").exec()
             val finger = Finger()
-//            finger.tap(randomX, randomY)
-//            finger.swipe(100, 200, 100, 100, 1)
-//            finger.switchApp()
-
-//            val client = GenerativeModel("gemini-2.0-flash", "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg")
-//            val prompt = "Explain quantum computing"
-//            val responses = client.generateContentStream(prompt)
-//            val fullText = buildString {
-//                responses.collect { part ->
-//                    append(part.text)
-//                }
-//            }
-//            println(fullText)
-
-
+            // finger.tap(randomX, randomY)
 
             withContext(Dispatchers.Main) {
                 val log = "👆 Tap at ($randomX, $randomY) at $timestamp"
                 statusText.text = log
                 logs.add(log)
             }
+        }
+    }
+
+    private fun handleUserInput(inputText: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val timestamp = dateFormat.format(Date())
+            val result = "🔧 Performing task with input: $inputText at $timestamp"
+
+            withContext(Dispatchers.Main) {
+                statusText.text = result
+                logs.add(result)
+            }
+
+            // You can insert actual task logic here, e.g.:
+            // if (inputText.contains("swipe")) finger.swipe(...)
+            // or trigger AI, scripts, etc.
         }
     }
 
