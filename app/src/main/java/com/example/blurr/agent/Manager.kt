@@ -22,7 +22,9 @@ class Manager : BaseAgent() {
             - Think logically and sequentially.
             - Identify what subgoal should be tackled next.
             - Adjust the plan if progress is blocked or results differ from expectations.
+            - If you see a keyboard on the screen, and your goals are to type, just start typing instead of enabling the input text box (Keyboard means the inputbox enabled)
             - Leverage any past shortcuts or user experience if relevant.
+            - for search use chrome
         
             Your output must follow the format:
             1. "### Thought ###" — Explain your reasoning.

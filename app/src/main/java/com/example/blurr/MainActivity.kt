@@ -138,7 +138,7 @@ class MainActivity : AppCompatActivity() {
 
             var iteration = 0
             var lastScreenshotFile: File? = null
-            val maxItr = 10
+            val maxItr = 20
             val maxConsecutiveFailures = 3
             val maxRepetitiveActions = 3
             val steps = mutableListOf<JSONObject>()
@@ -171,17 +171,11 @@ class MainActivity : AppCompatActivity() {
                 infoPool.lastSummary = infoPool.lastActionThought
                 println(parsedManagerPlan)
 
-                infoPool.perceptionInfosPre.forEach { element ->
-                    println("THE ELEMENT NAME : ${element.text}, COORDINATES : ${element.coordinates}")
-                }
-
                 // Step 3 Operator's turn, he will execute on the plan of manager
                 val operator = Operator(finger)
                 val actionPrompt = operator.getPrompt(infoPool)
-                println("ACTION PROMPT :::: $actionPrompt")
 
                 val actionChat = operator.initChat()
-//                println("SYSTEM PROMPT :::: "+actionChat[0].second[0].text)
                 val actionCombinedChat  = addResponse("user",actionPrompt, actionChat, screenshotPath )
                 var actionOutput = getReasoningModelApiResponse(actionCombinedChat, apiKey = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg")
                 println("ACTION OUTPUT :::: $actionOutput")

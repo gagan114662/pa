@@ -260,7 +260,7 @@ class Retina(
 
         val clickableInfos = mutableListOf<ClickableInfo>()
         val sanitizedJson = sanitizeJson(responseText)
-        println(sanitizedJson)
+//        println(sanitizedJson)
 
         val boxes = extractJsonArray(sanitizedJson)
         boxes.mapNotNull { obj ->

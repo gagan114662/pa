@@ -90,7 +90,8 @@ class Operator(private val finger: Finger) : BaseAgent() {
             - Use shortcuts when they are applicable to speed up common tasks.
             - Use accurate pixel coordinates for actions such as 'Tap' or 'Swipe'.
             - You may use available shortcuts, but you must ensure the preconditions are satisfied.
-    
+            - If you see a keyboard on the screen, and your goals are to type, just start typing instead of enabling the input text box (Keyboard means the inputbox enabled)
+
             Output format:
             Return the action in strict JSON format:
             {
@@ -189,7 +190,6 @@ class Operator(private val finger: Finger) : BaseAgent() {
     }
 
     fun executeAtomicAction(name: String, args: Map<*, *>, context: Context) {
-        println("in atomic action method")
 
         when (name.lowercase()) {
             "tap" -> finger.tap((args["x"] as Number).toInt(), (args["y"] as Number).toInt())
@@ -296,7 +296,6 @@ class Operator(private val finger: Finger) : BaseAgent() {
 
         // Execute atomic action
         if (atomicActionSignatures.containsKey(name)) {
-            println("Executing atomic action: $name, $arguments")
             if (name.equals("Open_App", ignoreCase = true)) {
                 val appName = arguments["app_name"]?.toString()?.trim() ?: return Triple(null, 0, "Missing app_name")
                 val textBlocks = extraArgs["textBlocks"] as? List<String> ?: return Triple(null, 0, "Missing textBlocks")
