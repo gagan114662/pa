@@ -5,12 +5,32 @@ import com.google.ai.client.generativeai.type.TextPart
 class Manager : BaseAgent() {
 
     override fun initChat(): List<Pair<String, List<TextPart>>> {
-        val systemPrompt = """
+        val systemPromptv1 = """
             You are a helpful AI assistant for operating mobile phones. 
             Your goal is to track progress and devise high-level plans to achieve the user's requests. 
             Think as if you are a human user operating the phone.
         """.trimIndent()
-        return listOf("system" to listOf(TextPart(systemPrompt)))
+        val systemPromptv2 = """
+            You are a strategic planner and intelligent assistant designed to operate a mobile phone like a highly capable user.
+            
+            Your role is to understand the user's goal from their instruction and create a clear, structured plan to achieve it. 
+            Think as if you are a human using the phone — tapping, scrolling, typing, or navigating — and apply common sense at every step.
+            
+            When faced with complex or ambiguous tasks, break them down into manageable subgoals. Always reason step-by-step and anticipate what is visible or clickable on the screen.
+            
+            You are expected to:
+            - Think logically and sequentially.
+            - Identify what subgoal should be tackled next.
+            - Adjust the plan if progress is blocked or results differ from expectations.
+            - Leverage any past shortcuts or user experience if relevant.
+        
+            Your output must follow the format:
+            1. "### Thought ###" — Explain your reasoning.
+            2. "### Plan ###" — A list of numbered subgoals.
+            3. "### Current Subgoal ###" — What should be executed now.
+        """.trimIndent()
+
+        return listOf("user" to listOf(TextPart(systemPromptv2)))
     }
 
     override fun getPrompt(infoPool: InfoPool): String {
@@ -18,19 +38,26 @@ class Manager : BaseAgent() {
         sb.appendLine("### User Instruction ###")
         sb.appendLine(infoPool.instruction)
         sb.appendLine()
-
+        if (infoPool.perceptionInfosPre.isNotEmpty()) {
+            sb.appendLine("### Visible Screen Elements ###")
+            sb.appendLine("The following UI elements are currently visible on the screen:")
+            infoPool.perceptionInfosPre.forEach { element ->
+                sb.appendLine("- Text: \"${element.text}\" at position ${element.coordinates}")
+            }
+            sb.appendLine()
+        }
         if (infoPool.plan.isEmpty()) {
             sb.appendLine("---")
             sb.appendLine("Think step by step and make a high-level plan to achieve the user's instruction.")
             sb.appendLine("Break down complex tasks into subgoals. The screenshot displays the starting state of the phone.\n")
 
-            if (infoPool.shortcuts.isNotEmpty()) {
-                sb.appendLine("### Available Shortcuts from Past Experience ###")
-                infoPool.shortcuts.forEach { (name, shortcut) ->
-                    sb.appendLine("- $name: ${shortcut.description} | Precondition: ${shortcut.precondition}")
-                }
-                sb.appendLine()
-            }
+//            if (infoPool.shortcuts.isNotEmpty()) {
+//                sb.appendLine("### Available Shortcuts from Past Experience ###")
+//                infoPool.shortcuts.forEach { (name, shortcut) ->
+//                    sb.appendLine("- $name: ${shortcut.description} | Precondition: ${shortcut.precondition}")
+//                }
+//                sb.appendLine()
+//            }
 
             sb.appendLine("---")
             sb.appendLine("Provide your output in the following format:\n")
@@ -82,6 +109,7 @@ class Manager : BaseAgent() {
             sb.appendLine("### Current Subgoal ###")
             sb.appendLine("Next subgoal to execute or write \"Finished\".")
         }
+
 
         return sb.toString()
     }

@@ -5,13 +5,25 @@ import com.google.ai.client.generativeai.type.TextPart
 class ActionReflector : BaseAgent() {
 
     override fun initChat(): List<Pair<String, List<TextPart>>> {
-        val systemPrompt = """
+        val systemPromptv1 = """
             You are a helpful AI assistant for operating mobile phones.
             Your goal is to verify whether the last action produced the expected behavior 
             and to keep track of the overall progress.
         """.trimIndent()
-        return listOf("system" to listOf(TextPart(systemPrompt)))
+        val systemPrompt = """
+        You are an intelligent agent responsible for verifying whether the last action taken on a mobile device achieved its intended outcome.
+        
+        Your responsibilities include:
+        - Comparing visual and textual changes before and after the action.
+        - Judging whether the result matches the user's intention.
+        - Updating the progress status or explaining failure cases.
+        
+        Use common sense and screen context to determine success or failure.
+    """.trimIndent()
+        return listOf("user" to listOf(TextPart(systemPrompt)))
     }
+
+
 
     override fun getPrompt(infoPool: InfoPool): String {
         val sb = StringBuilder()
@@ -29,7 +41,12 @@ class ActionReflector : BaseAgent() {
         sb.appendLine()
 
         sb.appendLine("---")
-        sb.appendLine("These are screenshots before and after the last action.")
+        sb.appendLine("This screenshots is after state of the last action.")
+
+        sb.appendLine("To help you better perceive the content in these screenshots, we have extracted positional information for the text elements and icons. ")
+        sb.appendLine("The format is: (coordinates; content). The coordinates are [x, y], where x represents the horizontal pixel position (from left to right) ")
+        sb.appendLine("and y represents the vertical pixel position (from top to bottom).")
+
         sb.appendLine("Screen dimensions: ${infoPool.width} x ${infoPool.height}")
         sb.appendLine()
 
@@ -39,7 +56,7 @@ class ActionReflector : BaseAgent() {
                 sb.appendLine("${it.coordinates}; ${it.text}")
             }
         }
-        sb.appendLine("Keyboard status before the action: ${if (infoPool.keyboardPre) "Active" else "Inactive"}\n")
+//        sb.appendLine("Keyboard status before the action: ${if (infoPool.keyboardPre) "Active" else "Inactive"}\n")
 
         sb.appendLine("### Screen Information After the Action ###")
         infoPool.perceptionInfosPost.forEach {
@@ -47,7 +64,10 @@ class ActionReflector : BaseAgent() {
                 sb.appendLine("${it.coordinates}; ${it.text}")
             }
         }
-        sb.appendLine("Keyboard status after the action: ${if (infoPool.keyboardPost) "Active" else "Inactive"}\n")
+
+        sb.appendLine("Note that these information might not be entirely accurate. ")
+        sb.appendLine("You should combine them with the screenshots to gain a better understanding.")
+//        sb.appendLine("Keyboard status after the action: ${if (infoPool.keyboardPost) "Active" else "Inactive"}\n")
 
         sb.appendLine("---")
         sb.appendLine("### Latest Action ###")
@@ -56,15 +76,21 @@ class ActionReflector : BaseAgent() {
         sb.appendLine()
 
         sb.appendLine("---")
-        sb.appendLine("Carefully examine the action outcome.")
+        sb.appendLine("Carefully examine the information provided above to determine whether the last action produced the expected behavior. If the action was successful, update the progress status accordingly. If the action failed, identify the failure mode and provide reasoning on the potential reason causing this failure. Note that for the 'Swipe' action, it may take multiple attempts to display the expected content. Thus, for a 'Swipe' action, if the screen shows new content, it usually meets the expectation.")
+        sb.appendLine()
         sb.appendLine("For 'Swipe' actions, partial screen changes can still be valid.")
+
+
         sb.appendLine("Use this format:\n")
         sb.appendLine("### Outcome ###")
-        sb.appendLine("A, B, or C\n")
+        sb.appendLine("Choose from the following options. Give your answer as \\\"A\\\", \\\"B\\\" or \\\"C\\\":\\n\"")
+        sb.appendLine("A: Successful or Partially Successful. The result of the last action meets the expectation.\\n")
+        sb.appendLine("B: Failed. The last action results in a wrong page. I need to return to the previous state.\\n")
+        sb.appendLine("C: Failed. The last action produces no changes.\\n\\n")
         sb.appendLine("### Error Description ###")
-        sb.appendLine("If failed, explain why. If successful, write 'None'.\n")
+        sb.appendLine("If the action failed, provide a detailed description of the error and the potential reason causing this failure. If the action succeeded, put \\\"None\\\" here.\\n\\n")
         sb.appendLine("### Progress Status ###")
-        sb.appendLine("Updated progress if successful, otherwise copy old status.")
+        sb.appendLine("If the action was successful or partially successful, update the progress status. If the action failed, copy the previous progress status")
 
         return sb.toString()
     }

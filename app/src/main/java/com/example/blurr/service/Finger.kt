@@ -1,5 +1,6 @@
 package com.example.blurr.service
 
+import android.content.Context
 import android.util.Log
 import com.topjohnwu.superuser.Shell
 import java.io.File
@@ -7,7 +8,6 @@ import java.io.File
 class Finger {
 
     private val TAG = "Finger"
-
     fun tap(x: Int, y: Int) {
         Shell.cmd("input tap $x $y").exec()
     }
@@ -31,6 +31,7 @@ class Finger {
     fun enter() {
         Shell.cmd("input keyevent KEYCODE_ENTER").exec()
     }
+
 
     fun back() {
         Shell.cmd("input keyevent 4").exec()

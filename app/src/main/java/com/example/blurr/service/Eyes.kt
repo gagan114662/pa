@@ -8,6 +8,7 @@ class Eyes(private val context: Context) {
     private val screenshotFile: File = File(context.filesDir, "latest.png")
 
     fun openEyes() {
+        println("Eyes are open")
         val output = screenshotFile.absolutePath
         Shell.cmd("screencap -p $output").exec()
     }

@@ -41,13 +41,7 @@ data class InfoPool(
     var futureTasks: MutableList<String> = mutableListOf()
 )
 
-data class Shortcut(
-    val name: String,
-    val arguments: List<String>,
-    val description: String,
-    val precondition: String,
-    val atomicActionSequence: List<AtomicAction>
-)
+
 
 data class AtomicAction(
     val name: String,
