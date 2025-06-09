@@ -16,6 +16,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import java.io.FileOutputStream
+import java.io.IOException
 
 class Retina(
     private val context: Context,
@@ -169,55 +170,97 @@ class Retina(
         val width = bitmap.width
         val height = bitmap.height
 
-        // Step 3: Prepare JSON request body
-        val payload = JSONObject()
-        payload.put("model", "gemini-2.0-flash")
+// Step 3: Prepare JSON request body with schema
+        val payload = JSONObject().apply {
+            put("model", "gemini-2.0-flash")
 
-        val content = JSONObject().apply {
-            put("parts", JSONArray().apply {
-                put(JSONObject().put("inline_data", JSONObject()
-                    .put("mime_type", "image/png")
-                    .put("data", base64Image)
-                ))
-                put(JSONObject().put("text", boundingBoxSystemInstructionsv3))
+            // Contents array
+            val content = JSONObject().apply {
+                put("parts", JSONArray().apply {
+                    put(JSONObject().put("inline_data", JSONObject()
+                        .put("mime_type", "image/png")
+                        .put("data", base64Image)
+                    ))
+                    put(JSONObject().put("text", boundingBoxSystemInstructionsv3))
+                })
+            }
+            put("contents", JSONArray().put(content))
+
+            // Generation config with response schema
+            put("generationConfig", JSONObject().apply {
+                put("responseMimeType", "application/json")
+                put("responseSchema", JSONObject().apply {
+                    put("type", "ARRAY")
+                    put("items", JSONObject().apply {
+                        put("type", "OBJECT")
+                        put("properties", JSONObject().apply {
+                            put("label", JSONObject().put("type", "STRING"))
+                            put("box_2d", JSONObject().apply {
+                                put("type", "ARRAY")
+                                put("items", JSONObject().put("type", "NUMBER"))
+                            })
+                        })
+                        put("propertyOrdering", JSONArray().apply {
+                            put("label")
+                            put("box_2d")
+                        })
+                    })
+                })
             })
         }
-        payload.put("contents", JSONArray().put(content))
 
         // Step 4: Send request to Gemini
-        val request = Request.Builder()
-            .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey")
-            .post(payload.toString().toRequestBody("application/json".toMediaType()))
-            .build()
 
-        val response = client.newCall(request).execute()
-        if (!response.isSuccessful) {
-            throw Exception("Gemini API failed: ${response.code} ${response.message}")
+        val clientWithTimeouts = client.newBuilder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(60, TimeUnit.SECONDS)
+            .build()
+        val maxRetries = 3
+        var attempt = 0
+        var lastException: Exception? = null
+        var responseText: String? = null
+
+        while (attempt < maxRetries && responseText == null) {
+            try {
+                val request = Request.Builder()
+                    .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey")
+                    .post(payload.toString().toRequestBody("application/json".toMediaType()))
+                    .build()
+
+                val response = clientWithTimeouts.newCall(request).execute()
+                response.use {
+                    if (!response.isSuccessful) {
+                        throw IOException("Gemini API failed: ${response.code} ${response.message}")
+                    }
+
+                    val resultJson = JSONObject(response.body?.string() ?: "")
+                    responseText = resultJson
+                        .getJSONArray("candidates")
+                        .getJSONObject(0)
+                        .getJSONObject("content")
+                        .getJSONArray("parts")
+                        .getJSONObject(0)
+                        .getString("text")
+                }
+            } catch (e: Exception) {
+                lastException = e
+                attempt++
+                if (attempt < maxRetries) {
+                    val delay = 1000L * attempt
+                    println("Gemini request failed (attempt $attempt), retrying in ${delay}ms: ${e.message}")
+                    Thread.sleep(delay)
+                }
+            }
         }
 
-        //  Parse the Gemini Response
-        val resultJson = JSONObject(response.body?.string() ?: "")
-        val responseText = resultJson
-            .getJSONArray("candidates")
-            .getJSONObject(0)
-            .getJSONObject("content")
-            .getJSONArray("parts")
-            .getJSONObject(0)
-            .getString("text")
+        if (responseText == null) {
+            throw lastException ?: Exception("Unknown error in Gemini API call")
+        }
 
         val clickableInfos = mutableListOf<ClickableInfo>()
         val sanitizedJson = sanitizeJson(responseText)
         println(sanitizedJson)
-        // check if valid json
-//        val b= try {
-//            JSONArray(sanitizedJson)
-//        } catch (e: Exception) {
-//            JSONArray()
-//        }
-//        if (b.length() == 0) {
-//            println("FAILED TO GET ANY PERCEPTION")
-//            return Triple(clickableInfos, width, height)
-//        }
 
         val boxes = extractJsonArray(sanitizedJson)
         boxes.mapNotNull { obj ->

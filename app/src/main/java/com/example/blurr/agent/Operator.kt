@@ -159,8 +159,8 @@ class Operator(private val finger: Finger) : BaseAgent() {
 
 
         sb.appendLine("#### Atomic Actions ####")
-        val validActions = if (infoPool.keyboardPre) atomicActionSignatures else atomicActionSignatures.filterKeys { it != "Type" }
-
+//        val validActions = if (infoPool.keyboardPre) atomicActionSignatures else atomicActionSignatures.filterKeys { it != "Type" }
+        val validActions = atomicActionSignatures
         validActions.forEach { (name, sig) ->
             sb.appendLine("- $name(${sig.arguments.joinToString()}): ${sig.description(infoPool)}")
         }
