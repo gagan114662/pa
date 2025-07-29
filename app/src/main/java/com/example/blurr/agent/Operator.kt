@@ -3,6 +3,7 @@ package com.example.blurr.agent
 import android.content.Context
 import com.example.blurr.api.Eyes
 import com.example.blurr.api.Finger
+import com.example.blurr.crawler.SemanticParser
 import com.google.ai.client.generativeai.type.TextPart
 import java.io.File
 import android.graphics.Bitmap
@@ -23,9 +24,13 @@ data class AtomicActionSignature(
 
 // Base atomic action signatures without Open_App
 val baseAtomicActionSignatures = mapOf(
-    "Tap" to AtomicActionSignature(
-        listOf("x", "y")
-    ) { "Tap the position (x, y) in current screen." },
+    // "Tap" to AtomicActionSignature(
+    //     listOf("x", "y")
+    // ) { "Tap the position (x, y) in current screen." },
+
+    "TapElement" to AtomicActionSignature(
+        listOf("element_id")
+    ) { "Tap the element with the specified numeric ID. Use this when you want to tap with a specific UI element by its ID number." },
 
     "Swipe" to AtomicActionSignature(
         listOf("x1", "y1", "x2", "y2")
@@ -121,10 +126,24 @@ class Operator(private val finger: Finger) : BaseAgent() {
         }
 
         if (infoPool.perceptionInfosPreXML.isNotEmpty() && config.isXmlMode) {
-            sb.appendLine("### Visible Screen Elements in XML format ###")
-            sb.appendLine("The following UI elements are currently visible on the screen in XML format:")
-            sb.appendLine(infoPool.perceptionInfosPreXML)
+            sb.appendLine("### Visible Screen Elements ###")
+            sb.appendLine("The following UI elements are currently visible on the screen:")
             sb.appendLine()
+            
+            // Add markdown format with numeric IDs
+            if (infoPool.currentElementsWithIds.isNotEmpty()) {
+                val semanticParser = SemanticParser(config.context)
+                val markdownElements = semanticParser.elementsToMarkdown(infoPool.currentElementsWithIds.map { it.element })
+                sb.appendLine(markdownElements)
+                sb.appendLine()
+                sb.appendLine("You can use the TapElement action with the numeric ID to interact with specific elements.")
+                sb.appendLine()
+            } else {
+                sb.appendLine("### Visible Screen Elements in XML format ###")
+                sb.appendLine("The following UI elements are currently visible on the screen in XML format:")
+                sb.appendLine(infoPool.perceptionInfosPreXML)
+                sb.appendLine()
+            }
         }
 
         sb.appendLine("Note that a search bar is often a long, rounded rectangle. If no search bar is presented and you want to perform a search, you may need to tap a search button, which is commonly represented by a magnifying glass.\n")
@@ -229,6 +248,16 @@ class Operator(private val finger: Finger) : BaseAgent() {
 
         when (name.lowercase()) {
             "tap" -> finger.tap((args["x"] as Number).toInt(), (args["y"] as Number).toInt())
+            "tapelement" -> {
+                val elementId = (args["element_id"] as Number).toInt()
+                val element = infoPool.currentElementsWithIds.find { it.id == elementId }
+                if (element != null) {
+                    finger.tap(element.centerX, element.centerY)
+                    println("Tapped element $elementId at coordinates (${element.centerX}, ${element.centerY})")
+                } else {
+                    println("Element with ID $elementId not found")
+                }
+            }
             "swipe" -> finger.swipe(
                 (args["x1"] as Number).toInt(),
                 (args["y1"] as Number).toInt(),

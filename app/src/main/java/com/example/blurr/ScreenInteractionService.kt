@@ -470,7 +470,7 @@ class ScreenInteractionService : AccessibilityService() {
         return "Interactable Screen Elements:\n" + elementStrings.joinToString("\n")
     }
 
-    suspend fun dumpWindowHierarchy(): String {
+    suspend fun dumpWindowHierarchy(pureXML: Boolean = false): String {
         return withContext(Dispatchers.Default) {
             val rootNode = rootInActiveWindow ?: run {
                 Log.e("InteractionService", "Root node is null, cannot dump hierarchy.")
@@ -506,11 +506,11 @@ class ScreenInteractionService : AccessibilityService() {
                     screenHeight = size.y
                 }
 
+                // Log.d("APPMAPXML", rawXml)
 
-
-//                val semanticParser = SemanticParser(this@ScreenInteractionService)
-//                val simplifiedJson = semanticParser.parse(rawXml, screenWidth, screenHeight)
-//                Log.d("APPMAP", "Screen Width: $screenWidth, Screen Height: $screenHeight\n$simplifiedJson")
+                // val semanticParser = SemanticParser(this@ScreenInteractionService)
+                // val simplifiedJson = semanticParser.parse(rawXml, screenWidth, screenHeight)
+                // Log.d("APPMAP", "Screen Width: $screenWidth, Screen Height: $screenHeight\n$simplifiedJson")
 //                // 1. Parse the raw XML into a structured list.
                 val simplifiedElements = parseXmlToSimplifiedElements(rawXml)
                 println("SIZEEEE : " + simplifiedElements.size)
@@ -519,6 +519,9 @@ class ScreenInteractionService : AccessibilityService() {
                     drawDebugBoundingBoxes(simplifiedElements)
                 }
 
+                if (pureXML) {
+                    return@withContext rawXml
+                }
                 // 3. Format the structured list into the final string for the LLM.
                 return@withContext formatElementsForLlm(simplifiedElements)
 
