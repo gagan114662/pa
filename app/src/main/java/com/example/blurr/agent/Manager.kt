@@ -24,21 +24,21 @@ class Manager : BaseAgent() {
             sb.appendLine()
         }
 
-        if (infoPool.perceptionInfosPre.isNotEmpty() && !config.isXmlMode ) {
-            sb.appendLine("### Visible Screen Elements ###")
-            sb.appendLine("The following UI elements are currently visible on the screen:")
-            infoPool.perceptionInfosPre.forEach { element ->
-                sb.appendLine("- Text: \"${element.text}\" at position ${element.coordinates}")
-            }
-            sb.appendLine()
-        }
-        if (infoPool.perceptionInfosPreXML.isNotEmpty() && config.isXmlMode) {
-            sb.appendLine("### Visible Screen Elements ###")
-            sb.appendLine("The following UI elements are currently visible on the screen in XML format:")
-            sb.appendLine(infoPool.perceptionInfosPreXML)
-            sb.appendLine()
-        }
         if (infoPool.plan.isEmpty()) {
+            if (config.isXmlMode) {
+                if (infoPool.perceptionInfosPreMarkdown.isNotEmpty()) {
+                    sb.appendLine("### Visible Screen Elements ###")
+                    sb.appendLine("The following UI elements are currently visible on the screen:")
+                    sb.appendLine()
+                    sb.appendLine(infoPool.perceptionInfosPreMarkdown)
+                    sb.appendLine()
+                } else if (infoPool.perceptionInfosPreXML.isNotEmpty()) {
+                    sb.appendLine("### Visible Screen Elements ###")
+                    sb.appendLine("The following UI elements are currently visible on the screen in XML format:")
+                    sb.appendLine(infoPool.perceptionInfosPreXML)
+                    sb.appendLine()
+                }
+            }
             sb.appendLine("---")
             sb.appendLine("Think step by step and make an high-level plan to achieve the user's instruction. If the request is complex, break it down into subgoals. If the request involves exploration, include concrete subgoals to quantify the investigation steps. The screenshot displays the starting state of the phone.\n\n")
 
@@ -59,12 +59,35 @@ class Manager : BaseAgent() {
             sb.appendLine("- Last Action Performed: ${infoPool.lastAction}")
             sb.appendLine("- Expected Outcome: ${infoPool.lastSummary}")
             sb.appendLine()
-            sb.appendLine("### Screen State Before Last Action (XML) ###")
-            sb.appendLine(infoPool.reflectionPreActionXML.ifEmpty { "N/A" })
-            sb.appendLine()
-            sb.appendLine("### Screen State After Last Action (XML) ###")
-            sb.appendLine("The current screen content provided in 'Visible Screen Elements' is the result of the last action.")
-            sb.appendLine()
+            
+            if (config.isXmlMode) {
+                if (infoPool.perceptionInfosPreMarkdown.isNotEmpty()) {
+                    sb.appendLine("### Screen State Before Last Action ###")
+                    sb.appendLine("The following UI elements were visible before the last action:")
+                    sb.appendLine()
+                    sb.appendLine(infoPool.perceptionInfosPreMarkdown)
+                    sb.appendLine()
+                }
+                
+                if (infoPool.perceptionInfosPostMarkdown.isNotEmpty()) {
+                    sb.appendLine("### Screen State After Last Action ###")
+                    sb.appendLine("The following UI elements are now visible after the last action:")
+                    sb.appendLine()
+                    sb.appendLine(infoPool.perceptionInfosPostMarkdown)
+                    sb.appendLine()
+                } else {
+                    sb.appendLine("### Screen State After Last Action ###")
+                    sb.appendLine("The current screen content provided in 'Visible Screen Elements' is the result of the last action.")
+                    sb.appendLine()
+                }
+            } else {
+                sb.appendLine("### Screen State Before Last Action (XML) ###")
+                sb.appendLine(infoPool.reflectionPreActionXML.ifEmpty { "N/A" })
+                sb.appendLine()
+                sb.appendLine("### Screen State After Last Action (XML) ###")
+                sb.appendLine("The current screen content provided in 'Visible Screen Elements' is the result of the last action.")
+                sb.appendLine()
+            }
 
             sb.appendLine("---")
             sb.appendLine("### Current Plan & Progress ###")
@@ -74,14 +97,7 @@ class Manager : BaseAgent() {
             sb.appendLine()
 
 
-//            if (infoPool.importantNotes.isNotEmpty()){
-//                infoPool.importantNotes.forEach { element ->
-//                    sb.appendLine("- $element ")
-//                }
-//                sb.appendLine("\n")
-//            }else{
-//                sb.appendLine("No important notes\n\n")
-//            }
+
 
             if (infoPool.errorFlagPlan) {
                 sb.appendLine("### Potentially Stuck! ###\n\n")

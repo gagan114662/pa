@@ -8,24 +8,17 @@ import android.os.IBinder
 import android.util.Log
 import androidx.annotation.RequiresApi
 import com.example.blurr.BuildConfig
-import com.example.blurr.agent.ActionReflector
 import com.example.blurr.agent.AgentConfigFactory
 import com.example.blurr.agent.InfoPool
 import com.example.blurr.agent.Manager
 import com.example.blurr.agent.Operator
 import com.example.blurr.agent.VisionHelper
-import com.example.blurr.agent.atomicActionSignatures
-import com.example.blurr.agent.tips.ReflectorTips
 import com.example.blurr.api.Eyes
 import com.example.blurr.api.Finger
-import com.example.blurr.api.MemoryService
 import com.example.blurr.api.Retina
-import com.example.blurr.utilities.AppContextUtility
+import com.example.blurr.crawler.SemanticParser
 import com.example.blurr.utilities.Persistent
 import com.example.blurr.utilities.SpeechCoordinator
-import com.example.blurr.utilities.TTSManager
-import com.example.blurr.utilities.UserIdManager
-import com.example.blurr.utilities.addResponse
 import com.example.blurr.utilities.getReasoningModelApiResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -286,6 +279,18 @@ class AgentTaskService : Service() {
                     if (config.isXmlMode && perceptionResult.xmlData.isNotEmpty()) {
                         infoPool.perceptionInfosPreXML = perceptionResult.xmlData
                         Log.d("AgentTaskService", "XML data captured: ${perceptionResult.xmlData.take(100)}...")
+                        
+                        // Parse XML with IDs and store in InfoPool
+                        val semanticParser = SemanticParser(context)
+                        val elementsWithIds = semanticParser.parseWithIds(perceptionResult.xmlData, perceptionResult.width, perceptionResult.height)
+                        infoPool.currentElementsWithIds.clear()
+                        infoPool.currentElementsWithIds.addAll(elementsWithIds)
+                        
+                        // Generate markdown for the elements and store for Manager
+                        val markdownElements = semanticParser.elementsToMarkdown(elementsWithIds.map { elementWithId -> elementWithId.element })
+                        infoPool.perceptionInfosPreMarkdown = markdownElements
+                        Log.d("AgentTaskService", "Parsed ${elementsWithIds.size} elements with IDs")
+                        Log.d("AgentTaskService", "Markdown elements: $markdownElements")
                     }
 
                     appendToFile(
@@ -449,7 +454,11 @@ class AgentTaskService : Service() {
                 appendToFile(taskLog, "{step: $iteration, operation: perception_post, xml_mode: ${config.isXmlMode}, duration: ${(perceptionPostEndTime - perceptionPostStartTime) / 1000} seconds}")
 
                 // --- Prepare for the next iteration's reflection context ---
-                // Save the XML from *before* and *after* the action we just took.
+                // Save the markdown data from *before* and *after* the action we just took.
+                // The pre-action markdown is already stored in infoPool.perceptionInfosPreMarkdown
+                // The post-action markdown is already stored in infoPool.perceptionInfosPostMarkdown
+                
+                // Also keep the XML data for backward compatibility
                 infoPool.reflectionPreActionXML = infoPool.perceptionInfosPreXML
                 infoPool.reflectionPostActionXML = postActionPerceptionResult.xmlData
 
@@ -458,6 +467,21 @@ class AgentTaskService : Service() {
                 screenshotFile = postScreenshotFile
                 infoPool.perceptionInfosPreXML = postActionPerceptionResult.xmlData
                 infoPool.keyboardPre = postActionPerceptionResult.keyboardOpen
+                
+                // Parse XML with IDs and store in InfoPool for post-action state
+                if (config.isXmlMode && postActionPerceptionResult.xmlData.isNotEmpty()) {
+                    val semanticParser = SemanticParser(context)
+                    val elementsWithIds = semanticParser.parseWithIds(postActionPerceptionResult.xmlData, postActionPerceptionResult.width, postActionPerceptionResult.height)
+                    infoPool.currentElementsWithIds.clear()
+                    infoPool.currentElementsWithIds.addAll(elementsWithIds)
+                    
+                    // Generate markdown for the elements and store for Manager
+                    val markdownElements = semanticParser.elementsToMarkdown(elementsWithIds.map { elementWithId -> elementWithId.element })
+                    infoPool.perceptionInfosPostMarkdown = markdownElements
+                    Log.d("AgentTaskService", "Post-action: Parsed ${elementsWithIds.size} elements with IDs")
+                    Log.d("AgentTaskService", "Post-action: Markdown elements: $markdownElements")
+                }
+                
                 // In XML mode, clickableInfos will be empty, so no need to update it.
 
                 // Inspired by your example, we can add a warning if the new XML is empty.

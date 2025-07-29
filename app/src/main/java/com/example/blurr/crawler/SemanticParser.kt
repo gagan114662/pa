@@ -11,6 +11,15 @@ import java.util.regex.Pattern
 import kotlin.math.max
 import kotlin.math.min
 
+/**
+ * Data class to store UI elements with their numeric IDs and coordinates
+ */
+data class UIElementWithId(
+    val id: Int,
+    val element: UIElement,
+    val centerX: Int,
+    val centerY: Int
+)
 
 /**
  * A sophisticated parser that simplifies the raw UI XML into a clean,
@@ -63,13 +72,177 @@ class SemanticParser(private  val applicationContext: Context) {
         return gson.toJson(preliminaryElements)
     }
 
+    /**
+     * Converts UI elements to markdown format with numeric IDs for easy reference.
+     *
+     * @param elements List of UI elements to convert
+     * @return A markdown string with numbered elements
+     */
+    fun elementsToMarkdown(elements: List<UIElement>): String {
+        if (elements.isEmpty()) {
+            return "No interactive elements found on screen."
+        }
+
+        val markdown = StringBuilder()
+        markdown.appendLine("# Screen Elements")
+        markdown.appendLine()
+        markdown.appendLine("The following elements are available for interaction:")
+        markdown.appendLine()
+
+        elements.forEachIndexed { index, element ->
+            val elementId = index + 1
+            markdown.appendLine("## $elementId. ${getElementDescription(element)}")
+            
+            // Add details about the element
+            val details = mutableListOf<String>()
+            
+            if (!element.text.isNullOrBlank()) {
+                details.add("**Text:** ${element.text}")
+            }
+            
+            if (!element.content_description.isNullOrBlank()) {
+                details.add("**Description:** ${element.content_description}")
+            }
+            
+            if (!element.class_name.isNullOrBlank()) {
+                details.add("**Type:** ${element.class_name}")
+            }
+            
+            if (!element.resource_id.isNullOrBlank()) {
+                details.add("**ID:** ${element.resource_id}")
+            }
+            
+            if (element.is_clickable) {
+                details.add("**Action:** Clickable")
+            }
+            
+            if (element.is_long_clickable) {
+                details.add("**Action:** Long-clickable")
+            }
+            
+            if (element.is_password) {
+                details.add("**Type:** Password field")
+            }
+            
+            if (details.isNotEmpty()) {
+                markdown.appendLine(details.joinToString(" | "))
+            }
+            
+            markdown.appendLine()
+        }
+
+        return markdown.toString()
+    }
+
+    /**
+     * Helper function to get a human-readable description of an element
+     */
+    private fun getElementDescription(element: UIElement): String {
+        val text = element.text
+        val contentDesc = element.content_description
+        val resourceId = element.resource_id
+        val className = element.class_name
+        
+        return when {
+            !text.isNullOrBlank() -> text
+            !contentDesc.isNullOrBlank() -> contentDesc
+            !resourceId.isNullOrBlank() -> resourceId
+            else -> className ?: "Unknown element"
+        }
+    }
+
+    /**
+     * Parses the raw XML hierarchy and returns both JSON and markdown formats.
+     *
+     * @param xmlString The raw XML content from the accessibility service.
+     * @param screenWidth The physical width of the device screen.
+     * @param screenHeight The physical height of the device screen.
+     * @return A pair containing (JSON string, markdown string)
+     */
+    fun parseWithMarkdown(xmlString: String, screenWidth: Int, screenHeight: Int): Pair<String, String> {
+        // Step 1: Build the complete tree from the XML.
+        val rootNode = buildTreeFromXml(xmlString)
+
+        // Step 2: Perform the semantic merge (upward text propagation).
+        if (rootNode != null) {
+            mergeDescriptiveChildren(rootNode)
+        }
+
+        // Step 3: Flatten the tree to a preliminary list of important elements.
+        val preliminaryElements = mutableListOf<UIElement>()
+        if (rootNode != null) {
+            flattenAndFilter(rootNode, preliminaryElements, screenWidth, screenHeight)
+        }
+
+        visualizeCurrentScreen(applicationContext, preliminaryElements)
+
+        // Step 4: Generate both JSON and markdown formats
+        val gson = GsonBuilder().setPrettyPrinting().create()
+        val jsonString = gson.toJson(preliminaryElements)
+        val markdownString = elementsToMarkdown(preliminaryElements)
+        
+        return Pair(jsonString, markdownString)
+    }
+
+    /**
+     * Parses the raw XML hierarchy and returns elements with IDs and coordinates.
+     *
+     * @param xmlString The raw XML content from the accessibility service.
+     * @param screenWidth The physical width of the device screen.
+     * @param screenHeight The physical height of the device screen.
+     * @return A list of UIElementWithId containing elements with their IDs and coordinates
+     */
+    fun parseWithIds(xmlString: String, screenWidth: Int, screenHeight: Int): List<UIElementWithId> {
+        // Step 1: Build the complete tree from the XML.
+        val rootNode = buildTreeFromXml(xmlString)
+
+        // Step 2: Perform the semantic merge (upward text propagation).
+        if (rootNode != null) {
+            mergeDescriptiveChildren(rootNode)
+        }
+
+        // Step 3: Flatten the tree to a preliminary list of important elements.
+        val preliminaryElements = mutableListOf<UIElement>()
+        if (rootNode != null) {
+            flattenAndFilter(rootNode, preliminaryElements, screenWidth, screenHeight)
+        }
+
+        visualizeCurrentScreen(applicationContext, preliminaryElements)
+
+        // Step 4: Convert to UIElementWithId with coordinates
+        return preliminaryElements.mapIndexed { index, element ->
+            val bounds = parseBounds(element.bounds)
+            val centerX = bounds?.let { (it.left + it.right) / 2 } ?: 0
+            val centerY = bounds?.let { (it.top + it.bottom) / 2 } ?: 0
+            
+            UIElementWithId(
+                id = index + 1,
+                element = element,
+                centerX = centerX,
+                centerY = centerY
+            )
+        }
+    }
+
+    /**
+     * Gets the coordinates of an element by its numeric ID.
+     *
+     * @param elementId The numeric ID of the element (1-based)
+     * @param elementsWithIds List of elements with IDs
+     * @return Pair of (x, y) coordinates, or null if element not found
+     */
+    fun getElementCoordinates(elementId: Int, elementsWithIds: List<UIElementWithId>): Pair<Int, Int>? {
+        val element = elementsWithIds.find { it.id == elementId }
+        return element?.let { Pair(it.centerX, it.centerY) }
+    }
+
 
     fun visualizeCurrentScreen(context: Context, elements: List<UIElement>) {
         // Create an instance of the drawer
         val overlayDrawer = DebugOverlayDrawer(context)
 
         // Call the function to draw the boxes. They will disappear automatically.
-        overlayDrawer.drawLabeledBoxes(elements)
+//        overlayDrawer.drawLabeledBoxes(elements)
     }
     /**
      * Traverses the XML and builds a tree of XmlNode objects, preserving the hierarchy.

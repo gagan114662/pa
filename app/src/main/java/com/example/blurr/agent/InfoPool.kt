@@ -1,5 +1,7 @@
 package com.example.blurr.agent
 
+import com.example.blurr.crawler.UIElementWithId
+
 data class ClickableInfo(
     val text: String,
     val coordinates: Pair<Int, Int>
@@ -45,7 +47,14 @@ data class InfoPool(
 
     var futureTasks: MutableList<String> = mutableListOf(),
 
-    var recalledMemories: String = ""
+    var recalledMemories: String = "",
+    
+    // Store current UI elements with their IDs and coordinates
+    var currentElementsWithIds: MutableList<UIElementWithId> = mutableListOf(),
+    
+    // Store markdown formatted elements for pre and post perception
+    var perceptionInfosPreMarkdown: String = "",
+    var perceptionInfosPostMarkdown: String = ""
 )
 
 

@@ -114,7 +114,7 @@ class Retina(
         if (config.isXmlMode) {
             Log.d("Retina", "Skipping visual analysis, using XML mode only")
             try {
-                xmlData = eyes.openXMLEyes()
+                xmlData = eyes.openPureXMLEyes()
                 Log.d("Retina", "XML data captured for XML mode")
             } catch (e: Exception) {
                 Log.e("Retina", "Failed to capture XML data", e)
