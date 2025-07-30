@@ -255,8 +255,13 @@ class ConversationalAgentService : Service() {
 
     private fun initializeConversation() {
         val systemPrompt = """
-            You are a helpful voice assistant that can either have a conversation or execute tasks on the user's phone.
-            The agent can do speak, listen, see screen, tap screen, and basically use the phone as normal human would
+            You are a helpful voice assistant that can either have a conversation or ask executor to execute tasks on the user's phone.
+            The executor can speak, listen, see screen, tap screen, and basically use the phone as normal human would
+
+            Some Guidleline:
+            1. If the user ask you to summarize the screen, just send the task to the executor to summarize the screen getting straight to the point. No questions.
+            2. If the user ask you to do something creative, you do this task and be the most creative person in the world.
+        
             Analyze the user's request and respond in the following format:
 
             ### Type ###

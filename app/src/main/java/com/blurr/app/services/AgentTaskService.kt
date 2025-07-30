@@ -4,9 +4,12 @@ import android.app.Service
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.util.Log
 import androidx.annotation.RequiresApi
+import androidx.core.app.NotificationCompat
 import com.blurr.app.BuildConfig
 import com.blurr.app.agent.AgentConfigFactory
 import com.blurr.app.agent.InfoPool
@@ -43,6 +46,13 @@ class AgentTaskService : Service() {
 
     @RequiresApi(Build.VERSION_CODES.R)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Handle stop action from notification
+        if (intent?.action == "STOP_TASK") {
+            Log.d("AgentTaskService", "Stop action received from notification")
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        
         val inputText = intent?.getStringExtra("TASK_INSTRUCTION")
         val visionMode = intent?.getStringExtra("VISION_MODE") ?: "XML" // Default to XML mode
 
@@ -54,6 +64,8 @@ class AgentTaskService : Service() {
 
         Log.d("AgentTaskService", "Starting agent task with input: $inputText, vision mode: $visionMode")
 
+        // Show notification with stop action
+       showTaskNotification(inputText)
        agentJob = CoroutineScope(Dispatchers.IO).launch {
            runAgentLogic(inputText, visionMode)
 
@@ -498,6 +510,49 @@ class AgentTaskService : Service() {
             }
         }
     }
+
+    private fun showTaskNotification(taskInstruction: String) {
+        try {
+            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
+            
+            // Create notification channel for Android O and above
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = android.app.NotificationChannel(
+                    NOTIFICATION_CHANNEL_ID,
+                    "Panda Task",
+                    android.app.NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "Shows when Panda is executing tasks"
+                }
+                notificationManager.createNotificationChannel(channel)
+            }
+            
+            // Create stop action intent
+            val stopIntent = Intent(this, AgentTaskService::class.java).apply {
+                action = "STOP_TASK"
+            }
+            val stopPendingIntent = android.app.PendingIntent.getService(
+                this, 0, stopIntent, 
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Build notification
+            val notification =NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+                .setContentTitle("🐼 Panda is working...")
+                .setContentText("Task: ${taskInstruction.take(50)}${if (taskInstruction.length > 50) "..." else ""}")
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setOngoing(true)
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Panda", stopPendingIntent)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .build()
+            
+            startForeground(NOTIFICATION_ID, notification)
+            Log.d("AgentTaskService", "Task notification shown")
+        } catch (e: Exception) {
+            Log.e("AgentTaskService", "Error showing task notification", e)
+        }
+    }
+
 
     override fun onDestroy() {
         super.onDestroy()
