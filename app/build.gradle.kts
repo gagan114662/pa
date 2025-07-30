@@ -15,11 +15,11 @@ if (localPropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.example.blurr"
+    namespace = "com.blurr.app"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.blurr"
+        applicationId = "com.blurr.app"
         minSdk = 24
         targetSdk = 35
         versionCode = 1
@@ -48,8 +48,6 @@ android {
             buildConfigField("String", "MEM0_API", "\"$mem0ApiKey\"")
             val picovoiceApiKey = localProperties.getProperty("PICOVOICE_ACCESS_KEY") ?: ""
             buildConfigField("String", "PICOVOICE_ACCESS_KEY", "\"$picovoiceApiKey\"")
-
-            // Debug flag for direct app opening (set to false for production)
             buildConfigField("boolean", "ENABLE_DIRECT_APP_OPENING", "true")
             buildConfigField("boolean", "SPEAK_INSTRUCTIONS", "true")
 
@@ -128,5 +126,5 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:34.0.0"))
     implementation("com.google.firebase:firebase-analytics")
 // build.gradle.kts
-    implementation("com.google.firebase:firebase-firestore")
+    implementation(libs.firebase.firestore)
 }
