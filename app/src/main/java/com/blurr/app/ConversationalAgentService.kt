@@ -34,6 +34,8 @@ import com.blurr.app.utilities.STTVisualizer
 import com.blurr.app.utilities.TTSManager
 import com.blurr.app.utilities.addResponse
 import com.blurr.app.utilities.getReasoningModelApiResponse
+import com.blurr.app.data.MemoryManager
+import com.blurr.app.data.MemoryExtractor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -64,6 +66,8 @@ class ConversationalAgentService : Service() {
      private val clarificationAgent = ClarificationAgent()
     private val windowManager by lazy { getSystemService(WINDOW_SERVICE) as WindowManager }
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
+    private val memoryManager by lazy { MemoryManager.getInstance(this) }
+    private val usedMemories = mutableSetOf<String>() // Track memories already used in this conversation
 
     companion object {
         const val NOTIFICATION_ID = 3
@@ -84,6 +88,7 @@ class ConversationalAgentService : Service() {
         initializeConversation()
         ttsManager.setCaptionsEnabled(true)
         clarificationAttempts = 0 // Reset clarification attempts counter
+        usedMemories.clear() // Clear used memories for new conversation
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -103,6 +108,8 @@ class ConversationalAgentService : Service() {
 
     @RequiresApi(Build.VERSION_CODES.O)
     private suspend fun speakAndThenListen(text: String, draw: Boolean = true) { // Default draw to true
+        // Update system prompt with relevant memories before processing
+        updateSystemPromptWithMemories()
         if (draw) {
             Log.d("ConvAgent", "Displaying agent utterance: $text. Setting captions to true.")
             ttsManager.setCaptionsEnabled(true)
@@ -141,6 +148,9 @@ class ConversationalAgentService : Service() {
 
             try {
                 if (userInput.equals("stop", ignoreCase = true) || userInput.equals("exit", ignoreCase = true)) {
+                    // Extract memories from the conversation before ending
+                    MemoryExtractor.extractAndStoreMemories(conversationHistory, memoryManager, serviceScope)
+                    
                     speakAndThenListen("Goodbye!")
                     delay(2000)
                     stopSelf()
@@ -173,7 +183,6 @@ class ConversationalAgentService : Service() {
                                 Log.d("ConvAgent", "Task is clear. Executing: ${decision.instruction}")
                                 speechCoordinator.speakText(decision.reply)
 
-
                                 val taskIntent = Intent(this@ConversationalAgentService, AgentTaskService::class.java).apply {
                                     putExtra("TASK_INSTRUCTION", decision.instruction)
                                     putExtra("VISION_MODE", "XML")
@@ -201,6 +210,10 @@ class ConversationalAgentService : Service() {
                         if (decision.shouldEnd) {
                             Log.d("ConvAgent", "Model decided to end the conversation.")
                             speechCoordinator.speakText(decision.reply)
+                            
+                            // Extract memories from the conversation before ending
+                            MemoryExtractor.extractAndStoreMemories(conversationHistory, memoryManager, serviceScope)
+                            
                             delay(2000)
                             stopSelf()
                         } else {
@@ -261,6 +274,7 @@ class ConversationalAgentService : Service() {
             Some Guidleline:
             1. If the user ask you to summarize the screen, just send the task to the executor to summarize the screen getting straight to the point. No questions.
             2. If the user ask you to do something creative, you do this task and be the most creative person in the world.
+
         
             Analyze the user's request and respond in the following format:
 
@@ -284,6 +298,67 @@ class ConversationalAgentService : Service() {
 
         conversationHistory = addResponse("user", systemPrompt, emptyList())
     }
+    
+    /**
+     * Updates the system prompt with relevant memories from the database
+     */
+    private suspend fun updateSystemPromptWithMemories() {
+        try {
+            // Get the last user message to search for relevant memories
+            val lastUserMessage = conversationHistory.lastOrNull { it.first == "user" }
+                ?.secondfilterIsInstance<TextPart>()
+                ?.joinToString(" ") { it.text } ?: ""
+            
+            if (lastUserMessage.isNotEmpty()) {
+                Log.d("ConvAgent", "Searching for memories relevant to: ${lastUserMessage.take(100)}...")
+                
+                val relevantMemories = memoryManager.searchMemories(lastUserMessage, topK = 5) // Get more memories to filter from
+                
+                if (relevantMemories.isNotEmpty()) {
+                    Log.d("ConvAgent", "Found ${relevantMemories.size} relevant memories")
+                    
+                    // Filter out memories that have already been used in this conversation
+                    val newMemories = relevantMemories.filter { memory ->
+                        !usedMemories.contains(memory)
+                    }.take(3) // Limit to top 3 new memories
+                    
+                    if (newMemories.isNotEmpty()) {
+                        Log.d("ConvAgent", "Adding ${newMemories.size} new memories to context")
+                        
+                        // Add new memories to the used set
+                        newMemories.forEach { usedMemories.add(it) }
+                        
+                        // Get current memory context from system prompt
+                        val currentPrompt = conversationHistory.first().second
+                            .filterIsInstance<TextPart>()
+                            .firstOrNull()?.text ?: ""
+                        
+                        val currentMemoryContext = extractCurrentMemoryContext(currentPrompt)
+                        val allMemories = (currentMemoryContext + newMemories).distinct()
+                        
+                        // Update the system prompt with all memories
+                        val memoryContext = allMemories.joinToString("\n") { "- $it" }
+                        val updatedPrompt = currentPrompt.replace("{memory_context}", memoryContext)
+                        
+                        if (updatedPrompt.isNotEmpty()) {
+                            // Replace the first system message with updated prompt
+                            conversationHistory = conversationHistory.toMutableList().apply {
+                                set(0, "user" to listOf(TextPart(updatedPrompt)))
+                            }
+                            Log.d("ConvAgent", "Updated system prompt with ${allMemories.size} total memories (${newMemories.size} new)")
+                        }
+                    } else {
+                        Log.d("ConvAgent", "No new memories to add (all relevant memories already used)")
+                    }
+                } else {
+                    Log.d("ConvAgent", "No relevant memories found")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ConvAgent", "Error updating system prompt with memories", e)
+        }
+    }
+    
 
     private fun parseModelResponse(response: String): ModelDecision {
         try {
@@ -448,6 +523,12 @@ class ConversationalAgentService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         Log.d("ConvAgent", "Service onDestroy")
+        
+        // Extract memories from the conversation before destroying the service
+        if (conversationHistory.size > 1) { // Only if there's actual conversation
+            MemoryExtractor.extractAndStoreMemories(conversationHistory, memoryManager, serviceScope)
+        }
+        
         removeClarificationQuestions()
         serviceScope.cancel()
         ttsManager.setCaptionsEnabled(false)

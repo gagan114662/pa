@@ -202,16 +202,42 @@ class AgentTaskService : Service() {
 
         var postScreenshotFile: Bitmap?
 
-        // Implementing Memory in the agent
-//        val userIdManager = UserIdManager(context)
-//        val userId = userIdManager.getOrCreateUserId()
-//        val memoryService = MemoryService()
+//        // Implementing Memory in the agent
+//        val memoryManager = MemoryManager.getInstance(context)
+//
+//        // Add the current task instruction to memory
 //        CoroutineScope(Dispatchers.IO).launch {
-//            memoryService.addMemory(infoPool.instruction, userId)
+//            try {
+//                Log.d("AgentTaskService", "Adding task instruction to memory: ${infoPool.instruction}")
+//                val success = memoryManager.addMemory(infoPool.instruction)
+//                if (success) {
+//                    Log.d("AgentTaskService", "Successfully added task instruction to memory")
+//                } else {
+//                    Log.e("AgentTaskService", "Failed to add task instruction to memory")
+//                }
+//            } catch (e: Exception) {
+//                Log.e("AgentTaskService", "Error adding task instruction to memory", e)
+//            }
 //        }
 //
-//        val recalledMemories = memoryService.searchMemory(infoPool.instruction, userId)
-////        infoPool.recalledMemories = "No recalledMemories"
+//        // Get relevant memories for the current task
+//        val recalledMemories = try {
+//            Log.d("AgentTaskService", "Searching for relevant memories for task: ${infoPool.instruction}")
+//            val relevantMemories = memoryManager.searchMemories(infoPool.instruction, topK = 3)
+//            if (relevantMemories.isNotEmpty()) {
+//                Log.d("AgentTaskService", "Found ${relevantMemories.size} relevant memories")
+//                relevantMemories.joinToString("\n") { "- $it" }
+//            } else {
+//                Log.d("AgentTaskService", "No relevant memories found")
+//                "No relevant memories found"
+//            }
+//        } catch (e: Exception) {
+//            Log.e("AgentTaskService", "Error searching memories", e)
+//            "Error retrieving memories"
+//        }
+//
+//        infoPool.recalledMemories = recalledMemories
+//        Log.d("AgentTaskService", "Recalled memories: $recalledMemories")
         while (true) {
                 iteration++
 

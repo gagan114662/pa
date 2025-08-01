@@ -1,0 +1,194 @@
+package com.blurr.app.data
+
+import android.content.Context
+import android.util.Log
+import com.blurr.app.api.EmbeddingService
+import com.blurr.app.MyApplication
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+
+/**
+ * Manager class for handling memory operations with embeddings
+ */
+class MemoryManager(private val context: Context) {
+    
+    private val database = AppDatabase.getDatabase(context)
+    private val memoryDao = database.memoryDao()
+    
+    /**
+     * Add a new memory with embedding
+     */
+    suspend fun addMemory(originalText: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d("MemoryManager", "Adding memory: ${originalText.take(100)}...")
+                
+                // Generate embedding for the text
+                val embedding = EmbeddingService.generateEmbedding(
+                    text = originalText,
+                    taskType = "RETRIEVAL_DOCUMENT"
+                )
+                
+                if (embedding == null) {
+                    Log.e("MemoryManager", "Failed to generate embedding for text")
+                    return@withContext false
+                }
+                
+                // Convert embedding to JSON string for storage
+                val embeddingJson = JSONArray(embedding).toString()
+                
+                // Create memory entity
+                val memory = Memory(
+                    originalText = originalText,
+                    embedding = embeddingJson
+                )
+                
+                // Save to database
+                val id = memoryDao.insertMemory(memory)
+                Log.d("MemoryManager", "Successfully added memory with ID: $id")
+                return@withContext true
+                
+            } catch (e: Exception) {
+                Log.e("MemoryManager", "Error adding memory", e)
+                return@withContext false
+            }
+        }
+    }
+    
+    /**
+     * Search for relevant memories based on a query
+     */
+    suspend fun searchMemories(query: String, topK: Int = 3): List<String> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d("MemoryManager", "Searching memories for query: ${query.take(100)}...")
+                
+                // Generate embedding for the query
+                val queryEmbedding = EmbeddingService.generateEmbedding(
+                    text = query,
+                    taskType = "RETRIEVAL_QUERY"
+                )
+                
+                if (queryEmbedding == null) {
+                    Log.e("MemoryManager", "Failed to generate embedding for query")
+                    return@withContext emptyList()
+                }
+                
+                // Get all memories from database
+                val allMemories = memoryDao.getAllMemoriesList()
+                
+                if (allMemories.isEmpty()) {
+                    Log.d("MemoryManager", "No memories found in database")
+                    return@withContext emptyList()
+                }
+                
+                // Calculate similarities and find top matches
+                val similarities = allMemories.map { memory ->
+                    val memoryEmbedding = parseEmbeddingFromJson(memory.embedding)
+                    val similarity = calculateCosineSimilarity(queryEmbedding, memoryEmbedding)
+                    Pair(memory.originalText, similarity)
+                }.sortedByDescending { it.second }
+                
+                // Return top K memories
+                val topMemories = similarities.take(topK).map { it.first }
+                Log.d("MemoryManager", "Found ${topMemories.size} relevant memories")
+                return@withContext topMemories
+                
+            } catch (e: Exception) {
+                Log.e("MemoryManager", "Error searching memories", e)
+                return@withContext emptyList()
+            }
+        }
+    }
+    
+    /**
+     * Get relevant memories for a task and format them for prompt augmentation
+     */
+    suspend fun getRelevantMemories(taskDescription: String): String {
+        val relevantMemories = searchMemories(taskDescription, topK = 3)
+        
+        return if (relevantMemories.isNotEmpty()) {
+            buildString {
+                appendLine("--- Relevant Information ---")
+                relevantMemories.forEach { memory ->
+                    appendLine("- $memory")
+                }
+                appendLine()
+                appendLine("--- My Task ---")
+                appendLine(taskDescription)
+            }
+        } else {
+            // If no relevant memories, just return the original task
+            taskDescription
+        }
+    }
+    
+    /**
+     * Get memory count
+     */
+    suspend fun getMemoryCount(): Int {
+        return withContext(Dispatchers.IO) {
+            memoryDao.getMemoryCount()
+        }
+    }
+    
+    /**
+     * Delete all memories
+     */
+    suspend fun clearAllMemories() {
+        withContext(Dispatchers.IO) {
+            memoryDao.deleteAllMemories()
+            Log.d("MemoryManager", "All memories cleared")
+        }
+    }
+    
+    /**
+     * Parse embedding from JSON string
+     */
+    private fun parseEmbeddingFromJson(embeddingJson: String): List<Float> {
+        return try {
+            val jsonArray = JSONArray(embeddingJson)
+            (0 until jsonArray.length()).map { i ->
+                jsonArray.getDouble(i).toFloat()
+            }
+        } catch (e: Exception) {
+            Log.e("MemoryManager", "Error parsing embedding JSON", e)
+            emptyList()
+        }
+    }
+    
+    /**
+     * Calculate cosine similarity between two vectors
+     */
+    private fun calculateCosineSimilarity(vector1: List<Float>, vector2: List<Float>): Float {
+        if (vector1.size != vector2.size) {
+            Log.w("MemoryManager", "Vector dimensions don't match: ${vector1.size} vs ${vector2.size}")
+            return 0f
+        }
+        
+        var dotProduct = 0f
+        var norm1 = 0f
+        var norm2 = 0f
+        
+        for (i in vector1.indices) {
+            dotProduct += vector1[i] * vector2[i]
+            norm1 += vector1[i] * vector1[i]
+            norm2 += vector2[i] * vector2[i]
+        }
+        
+        val denominator = kotlin.math.sqrt(norm1) * kotlin.math.sqrt(norm2)
+        return if (denominator > 0) dotProduct / denominator else 0f
+    }
+    
+    companion object {
+        private var instance: MemoryManager? = null
+        
+        fun getInstance(context: Context = MyApplication.appContext): MemoryManager {
+            return instance ?: synchronized(this) {
+                instance ?: MemoryManager(context).also { instance = it }
+            }
+        }
+    }
+} 
