@@ -213,6 +213,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // Add memories button click listener
+        val memoriesButton = findViewById<TextView>(R.id.memoriesButton)
+        memoriesButton.setOnClickListener {
+            val intent = Intent(this, MemoriesActivity::class.java)
+            startActivity(intent)
+        }
+
     }
 
     // REMOVED setupVisionModeListener()

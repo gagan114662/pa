@@ -333,7 +333,6 @@ class SemanticParser(private  val applicationContext: Context) {
         if (isImportant && !node.isSubsumed) {
             // Add a check to ensure the element is within the visible screen bounds.
             val bounds = parseBounds(node.get("bounds"))
-            Log.d("DIM", "Bounds: $bounds, ${node.get("content-desc")}")
             if (bounds != null &&
 //                [2160,690][1080,878]
                bounds.left >= 0 && bounds.right <= screenWidth && // Horizontal check

@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("com.google.gms.google-services")
+    alias(libs.plugins.ksp)
 }
 
 val localProperties = Properties()
@@ -127,4 +128,9 @@ dependencies {
     implementation("com.google.firebase:firebase-analytics")
 // build.gradle.kts
     implementation(libs.firebase.firestore)
+    
+    // Room database dependencies
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
 }
