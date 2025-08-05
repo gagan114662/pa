@@ -8,7 +8,7 @@ import androidx.room.RoomDatabase
 /**
  * Room database for storing memories
  */
-@Database(entities = [Memory::class], version = 1, exportSchema = false)
+@Database(entities = [Memory::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     
     abstract fun memoryDao(): MemoryDao
@@ -23,7 +23,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "blurr_memory_database"
-                ).build()
+                )
+                .fallbackToDestructiveMigration() // This will recreate the database if schema changes
+                .build()
                 INSTANCE = instance
                 instance
             }

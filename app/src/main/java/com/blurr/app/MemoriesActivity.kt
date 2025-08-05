@@ -1,8 +1,11 @@
 package com.blurr.app
 
+import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.widget.EditText
 import android.widget.TextView
@@ -51,9 +54,32 @@ class MemoriesActivity : AppCompatActivity() {
         emptyStateText = findViewById(R.id.emptyStateText)
         addMemoryFab = findViewById(R.id.addMemoryFab)
         
+        // Setup privacy card click listener
+        val privacyCard = findViewById<com.google.android.material.card.MaterialCardView>(R.id.privacyCard)
+        privacyCard.setOnClickListener {
+            val intent = Intent(this, PrivacyActivity::class.java)
+            startActivity(intent)
+        }
+        
         // Setup FAB click listener
         addMemoryFab.setOnClickListener {
             showAddMemoryDialog()
+        }
+    }
+    
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_memories, menu)
+        return true
+    }
+    
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_privacy -> {
+                val intent = Intent(this, PrivacyActivity::class.java)
+                startActivity(intent)
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
         }
     }
     

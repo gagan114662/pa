@@ -6,6 +6,7 @@ import com.google.ai.client.generativeai.type.TextPart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Extracts and stores memories from conversations using LLM-based memory extraction
@@ -25,6 +26,9 @@ object MemoryExtractor {
         - Generic statements or hypothetical scenarios
         - Technical details or app-specific information
         
+        IMPORTANT: Do NOT extract memories that are semantically equivalent to the following already known memories:
+        {used_memories}
+        
         Format each memory as a clear, concise sentence that captures the essential fact.
         If no significant memories are found, return "NO_MEMORIES".
         
@@ -37,21 +41,36 @@ object MemoryExtractor {
     /**
      * Extracts memories from a conversation and stores them asynchronously
      * This is a fire-and-forget operation that doesn't block the conversation flow
+     * 
+     * @param conversationHistory The conversation to extract memories from
+     * @param memoryManager The memory manager instance
+     * @param scope The coroutine scope for async operations
+     * @param usedMemories Set of memories already used in this conversation to avoid duplicates
      */
-    fun extractAndStoreMemories(
+    suspend fun extractAndStoreMemories(
         conversationHistory: List<Pair<String, List<Any>>>,
         memoryManager: MemoryManager,
-        scope: CoroutineScope
+        usedMemories: Set<String> = emptySet()
     ) {
-        scope.launch(Dispatchers.IO) {
+        withContext(Dispatchers.IO) {
             try {
                 Log.d("MemoryExtractor", "Starting memory extraction from conversation")
+                Log.d("MemoryExtractor", "Used memories count: ${usedMemories.size}")
                 
                 // Convert conversation to text format for analysis
                 val conversationText = formatConversationForExtraction(conversationHistory)
                 
-                // Create the extraction prompt
-                val extractionPrompt = memoryExtractionPrompt.replace("{conversation}", conversationText)
+                // Format used memories for the prompt
+                val usedMemoriesText = if (usedMemories.isNotEmpty()) {
+                    usedMemories.joinToString("\n") { "- $it" }
+                } else {
+                    "None"
+                }
+                
+                // Create the extraction prompt with used memories
+                val extractionPrompt = memoryExtractionPrompt
+                    .replace("{conversation}", conversationText)
+                    .replace("{used_memories}", usedMemoriesText)
                 
                 // Call LLM for memory extraction
                 val extractionChat = listOf(
@@ -69,7 +88,7 @@ object MemoryExtractor {
                     if (memories.isNotEmpty()) {
                         Log.d("MemoryExtractor", "Extracted ${memories.size} memories")
                         
-                        // Store each memory asynchronously
+                        // Store each memory asynchronously (no need for string filtering since LLM handles it)
                         memories.forEach { memory ->
                             try {
                                 val success = memoryManager.addMemory(memory)

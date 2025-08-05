@@ -39,7 +39,7 @@ class Manager : BaseAgent() {
                 }
             }
             sb.appendLine("---")
-            sb.appendLine("Think step by step and make an high-level plan to achieve the user's instruction. If the request is complex, break it down into subgoals. If the request involves exploration, include concrete subgoals to quantify the investigation steps. The Markdown displays the starting state of the phone.\n\n")
+            sb.appendLine("Think step by step and make an high-level plan to achieve the user's instruction. If the request is complex, break it down into subgoals. If the request involves exploration, include concrete subgoals to quantify the investigation steps. The screenshot displays the starting state of the phone.\n\n")
 
             sb.appendLine("---")
             sb.appendLine("Provide your output in the following format which contains three parts:\n")
@@ -132,7 +132,6 @@ class Manager : BaseAgent() {
             sb.appendLine("The next subgoal to work on. If all subgoals are completed, write 'Finished'.")
         }
 
-        sb.appendLine("\nNOTE:You pass this plan to an operator, he can tap elements, type, go back (in screens), go to home screen, speak something, ask questions, directly open app without searching it. This is a multi agent system. \n")
 
         return sb.toString()
     }

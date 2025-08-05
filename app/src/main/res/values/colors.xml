@@ -15,4 +15,12 @@
     <color name="gradient_start">#FFC882FF</color>
     <color name="gradient_end">#FFA182FF</color>
     <color name="panel_background">#FF1C1C1E</color>
+    
+    <!-- Memory management colors -->
+    <color name="background">#FFFFFF</color>
+    <color name="primary">#6200EE</color>
+    <color name="accent">#03DAC5</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="text_primary">#000000</color>
+    <color name="text_secondary">#666666</color>
 </resources>

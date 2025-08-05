@@ -12,10 +12,10 @@ interface MemoryDao {
     @Insert
     suspend fun insertMemory(memory: Memory): Long
     
-    @Query("SELECT * FROM memories ORDER BY id DESC")
+    @Query("SELECT * FROM memories ORDER BY timestamp DESC")
     fun getAllMemories(): Flow<List<Memory>>
     
-    @Query("SELECT * FROM memories")
+    @Query("SELECT * FROM memories ORDER BY timestamp DESC")
     suspend fun getAllMemoriesList(): List<Memory>
     
     @Query("SELECT * FROM memories WHERE id = :id")
@@ -23,6 +23,9 @@ interface MemoryDao {
     
     @Delete
     suspend fun deleteMemory(memory: Memory)
+    
+    @Query("DELETE FROM memories WHERE id = :id")
+    suspend fun deleteMemoryById(id: Long)
     
     @Query("DELETE FROM memories")
     suspend fun deleteAllMemories()

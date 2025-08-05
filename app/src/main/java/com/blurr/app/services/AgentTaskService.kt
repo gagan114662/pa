@@ -365,8 +365,7 @@ class AgentTaskService : Service() {
 
 
             // ADD this entire block inside your while(true) loop
-
-// Step 2 & 5 Combined: Manager Reflects on previous action and Plans the next one
+            // Step 2 & 5 Combined: Manager Reflects on previous action and Plans the next one
             val managerThinkingStart = System.currentTimeMillis()
             val promptPlan = manager.getPrompt(infoPool, config)
             val chatPlan = manager.initChat()
@@ -377,7 +376,7 @@ class AgentTaskService : Service() {
             val parsedManagerResponse = manager.parseResponse(outputPlan.toString())
             val managerThinkingEnd = System.currentTimeMillis()
 
-// --- Process Reflection Output from Manager ---
+            // --- Process Reflection Output from Manager ---
             if (iteration > 1) { // No reflection on the first iteration
                 val outcome = parsedManagerResponse["outcome"].toString()
                 val errorDescription = parsedManagerResponse["error_description"].toString()

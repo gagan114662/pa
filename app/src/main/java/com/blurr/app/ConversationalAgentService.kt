@@ -36,6 +36,7 @@ import com.blurr.app.utilities.addResponse
 import com.blurr.app.utilities.getReasoningModelApiResponse
 import com.blurr.app.data.MemoryManager
 import com.blurr.app.data.MemoryExtractor
+import com.google.ai.client.generativeai.type.TextPart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -62,6 +63,8 @@ class ConversationalAgentService : Service() {
     // Add these at the top of your ConversationalAgentService class
     private var clarificationAttempts = 0
     private val maxClarificationAttempts = 1
+    private var sttErrorAttempts = 0
+    private val maxSttErrorAttempts = 2
 
      private val clarificationAgent = ClarificationAgent()
     private val windowManager by lazy { getSystemService(WINDOW_SERVICE) as WindowManager }
@@ -74,11 +77,6 @@ class ConversationalAgentService : Service() {
         const val CHANNEL_ID = "ConversationalAgentChannel"
         var isRunning = false
     }
-    private enum class AgentState {
-        IDLE,
-        AWAITING_CLARIFICATION,
-        EXECUTING_TASK
-    }
 
     override fun onCreate() {
         super.onCreate()
@@ -88,6 +86,7 @@ class ConversationalAgentService : Service() {
         initializeConversation()
         ttsManager.setCaptionsEnabled(true)
         clarificationAttempts = 0 // Reset clarification attempts counter
+        sttErrorAttempts = 0 // Reset STT error attempts counter
         usedMemories.clear() // Clear used memories for new conversation
     }
 
@@ -98,12 +97,89 @@ class ConversationalAgentService : Service() {
 
         serviceScope.launch {
             if (conversationHistory.size == 1) {
-                val greeting = "Hello! How can I help you today?"
+                val greeting = getPersonalizedGreeting()
                 conversationHistory = addResponse("model", greeting, conversationHistory)
                 speakAndThenListen(greeting)
             }
         }
         return START_STICKY
+    }
+    
+    /**
+     * Gets a personalized greeting using the user's name from memories if available
+     */
+    private suspend fun getPersonalizedGreeting(): String {
+        try {
+            // Search for name-related memories
+            val nameMemories = memoryManager.searchMemories("name", topK = 10)
+            
+            if (nameMemories.isNotEmpty()) {
+                // Look for memories that contain name information
+                val nameMemory = nameMemories.find { memory ->
+                    memory.lowercase().contains("name") && 
+                    (memory.lowercase().contains("is") || memory.lowercase().contains("called"))
+                }
+                
+                if (nameMemory != null) {
+                    // Extract the name from the memory
+                    val name = extractNameFromMemory(nameMemory)
+                    if (name.isNotEmpty()) {
+                        Log.d("ConvAgent", "Found user name: $name")
+                        return "Hello $name! How can I help you today?"
+                    }
+                }
+            }
+            
+            // Fallback to generic greeting
+            Log.d("ConvAgent", "No name found in memories, using generic greeting")
+            return "How can I help?"
+            
+        } catch (e: Exception) {
+            Log.e("ConvAgent", "Error getting personalized greeting", e)
+            return "How can I help?"
+        }
+    }
+    
+    /**
+     * Extracts the user's name from a memory string
+     */
+    private fun extractNameFromMemory(memory: String): String {
+        return try {
+            // Common patterns for name memories
+            val patterns = listOf(
+                Regex("""(?:my|user'?s?)\s+name\s+is\s+(\w+)""", RegexOption.IGNORE_CASE),
+                Regex("""(?:i'?m|i am)\s+(?:called\s+)?(\w+)""", RegexOption.IGNORE_CASE),
+                Regex("""(?:name|called)\s+(?:is\s+)?(\w+)""", RegexOption.IGNORE_CASE),
+                Regex("""(\w+)\s+is\s+(?:my|user'?s?)\s+name""", RegexOption.IGNORE_CASE)
+            )
+            
+            for (pattern in patterns) {
+                val match = pattern.find(memory)
+                if (match != null) {
+                    val name = match.groupValues[1]
+                    if (name.length > 1 && name.all { it.isLetter() }) {
+                        return name.capitalize()
+                    }
+                }
+            }
+            
+            // If no pattern matches, try to extract any capitalized word that might be a name
+            val words = memory.split(" ")
+            for (word in words) {
+                if (word.length > 2 && word[0].isUpperCase() && word.all { it.isLetter() }) {
+                    // Check if it's not a common word
+                    val commonWords = setOf("the", "and", "but", "for", "with", "this", "that", "they", "have", "from")
+                    if (!commonWords.contains(word.lowercase())) {
+                        return word
+                    }
+                }
+            }
+            
+            ""
+        } catch (e: Exception) {
+            Log.e("ConvAgent", "Error extracting name from memory", e)
+            ""
+        }
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -127,8 +203,17 @@ class ConversationalAgentService : Service() {
             },
             onError = { error ->
                 Log.e("ConvAgent", "STT Error: $error")
+                sttErrorAttempts++
+                
                 serviceScope.launch {
-                    speakAndThenListen("I'm sorry, I didn't catch that.")
+                    if (sttErrorAttempts >= maxSttErrorAttempts) {
+                        Log.d("ConvAgent", "Max STT error attempts reached ($maxSttErrorAttempts). Ending conversation gracefully.")
+                        val exitMessage = "I'm having trouble understanding you clearly. Please try calling later!"
+                        gracefulShutdown(exitMessage)
+                    } else {
+                        Log.d("ConvAgent", "STT error attempt $sttErrorAttempts/$maxSttErrorAttempts")
+                        speakAndThenListen("I'm sorry, I didn't catch that. Could you please repeat?")
+                    }
                 }
             },
             onListeningStateChange = { listening ->
@@ -148,12 +233,7 @@ class ConversationalAgentService : Service() {
 
             try {
                 if (userInput.equals("stop", ignoreCase = true) || userInput.equals("exit", ignoreCase = true)) {
-                    // Extract memories from the conversation before ending
-                    MemoryExtractor.extractAndStoreMemories(conversationHistory, memoryManager, serviceScope)
-                    
-                    speakAndThenListen("Goodbye!")
-                    delay(2000)
-                    stopSelf()
+                    gracefulShutdown("Goodbye!")
                     return@launch
                 }
 
@@ -174,34 +254,26 @@ class ConversationalAgentService : Service() {
                             if (needsClarification) {
                                 clarificationAttempts++
                                 displayClarificationQuestions(questions)
-                                // If clarification is needed, ask the questions and continue the conversation.
                                 val questionToAsk = "I can help with that, but first: ${questions.joinToString(" and ")}"
                                 Log.d("ConvAgent", "Task needs clarification. Asking: '$questionToAsk' (Attempt $clarificationAttempts/$maxClarificationAttempts)")
                                 conversationHistory = addResponse("model", "Clarification needed for task: ${decision.instruction}", conversationHistory)
                                 speakAndThenListen(questionToAsk, false)
                             } else {
                                 Log.d("ConvAgent", "Task is clear. Executing: ${decision.instruction}")
-                                speechCoordinator.speakText(decision.reply)
-
                                 val taskIntent = Intent(this@ConversationalAgentService, AgentTaskService::class.java).apply {
                                     putExtra("TASK_INSTRUCTION", decision.instruction)
                                     putExtra("VISION_MODE", "XML")
                                 }
                                 startService(taskIntent)
-                                stopSelf()
-                            }
+                                gracefulShutdown(decision.reply)                            }
                         } else {
-                            // Max attempts reached, proceed directly without checking for clarification
                             Log.d("ConvAgent", "Max clarification attempts reached ($maxClarificationAttempts). Proceeding with task execution.")
-                            speechCoordinator.speakText(decision.reply)
-//                            delay(1500)
-
                             val taskIntent = Intent(this@ConversationalAgentService, AgentTaskService::class.java).apply {
                                 putExtra("TASK_INSTRUCTION", decision.instruction)
                                 putExtra("VISION_MODE", "XML")
                             }
                             startService(taskIntent)
-                            stopSelf()
+                            gracefulShutdown(decision.reply)
                         }
 
 
@@ -209,13 +281,7 @@ class ConversationalAgentService : Service() {
                     else -> { // Default to "Reply"
                         if (decision.shouldEnd) {
                             Log.d("ConvAgent", "Model decided to end the conversation.")
-                            speechCoordinator.speakText(decision.reply)
-                            
-                            // Extract memories from the conversation before ending
-                            MemoryExtractor.extractAndStoreMemories(conversationHistory, memoryManager, serviceScope)
-                            
-                            delay(2000)
-                            stopSelf()
+                            gracefulShutdown(decision.reply)
                         } else {
                             conversationHistory = addResponse("model", rawModelResponse, conversationHistory)
                             speakAndThenListen(decision.reply)
@@ -271,10 +337,15 @@ class ConversationalAgentService : Service() {
             You are a helpful voice assistant that can either have a conversation or ask executor to execute tasks on the user's phone.
             The executor can speak, listen, see screen, tap screen, and basically use the phone as normal human would
 
-            Some Guidleline:
+            Some Guideline:
             1. If the user ask you to summarize the screen, just send the task to the executor to summarize the screen getting straight to the point. No questions.
             2. If the user ask you to do something creative, you do this task and be the most creative person in the world.
+            3. If you know the user's name from the memories, refer to them by their name to make the conversation more personal and friendly.
 
+            Use these memories to answer the user's question with his personal data
+            ### Memory Context Start ###
+            {memory_context}
+            ### Memory Context Ends ###
         
             Analyze the user's request and respond in the following format:
 
@@ -287,6 +358,7 @@ class ConversationalAgentService : Service() {
             The conversational text to speak to the user.
             - If it's a task, this should be a confirmation, like "Okay, opening settings." or "Sure, I can do that.".
             - If it's a reply, this is the answer to the user's question.
+            - If you know the user's name, use it naturally in your responses to make the conversation more personal.
 
             ### Instruction ###
             - If Type is "Task", provide the precise, literal instruction for the task agent here. This should be a complete command.
@@ -306,7 +378,7 @@ class ConversationalAgentService : Service() {
         try {
             // Get the last user message to search for relevant memories
             val lastUserMessage = conversationHistory.lastOrNull { it.first == "user" }
-                ?.secondfilterIsInstance<TextPart>()
+                ?.second?.filterIsInstance<TextPart>()
                 ?.joinToString(" ") { it.text } ?: ""
             
             if (lastUserMessage.isNotEmpty()) {
@@ -358,8 +430,58 @@ class ConversationalAgentService : Service() {
             Log.e("ConvAgent", "Error updating system prompt with memories", e)
         }
     }
-    
 
+
+    /**
+     * Extracts current memory context from the system prompt
+     */
+    private fun extractCurrentMemoryContext(prompt: String): List<String> {
+        return try {
+            val memorySection = prompt.substringAfter("##### MEMORY CONTEXT #####")
+                .substringBefore("##### END MEMORY CONTEXT #####")
+                .trim()
+
+            if (memorySection.isNotEmpty() && !memorySection.contains("{memory_context}")) {
+                memorySection.lines()
+                    .filter { it.trim().startsWith("- ") }
+                    .map { it.trim().substring(2) } // Remove "- " prefix
+                    .filter { it.isNotEmpty() }
+            } else {
+                emptyList()
+            }
+        } catch (e: Exception) {
+            Log.e("ConvAgent", "Error extracting current memory context", e)
+            emptyList()
+        }
+    }
+    
+    /**
+     * Gets the user's name from the current memory context if available
+     */
+    private fun getUserNameFromCurrentContext(): String {
+        return try {
+            val currentPrompt = conversationHistory.first().second
+                .filterIsInstance<TextPart>()
+                .firstOrNull()?.text ?: ""
+            
+            val currentMemories = extractCurrentMemoryContext(currentPrompt)
+            
+            // Look for name-related memories in the current context
+            val nameMemory = currentMemories.find { memory ->
+                memory.lowercase().contains("name") && 
+                (memory.lowercase().contains("is") || memory.lowercase().contains("called"))
+            }
+            
+            if (nameMemory != null) {
+                extractNameFromMemory(nameMemory)
+            } else {
+                ""
+            }
+        } catch (e: Exception) {
+            Log.e("ConvAgent", "Error getting user name from current context", e)
+            ""
+        }
+    }
     private fun parseModelResponse(response: String): ModelDecision {
         try {
             val type = response.substringAfter("### Type ###", "").substringBefore("###").trim()
@@ -519,16 +641,27 @@ class ConversationalAgentService : Service() {
             clarificationQuestionViews.clear()
         }
     }
+    private suspend fun gracefulShutdown(exitMessage: String? = null) {
 
+            // 1. Extract memories from the conversation before ending
+            if (conversationHistory.size > 1) {
+                Log.d("ConvAgent", "Extracting memories before shutdown.")
+                MemoryExtractor.extractAndStoreMemories(conversationHistory, memoryManager, usedMemories)
+            }
+
+            // 2. Speak an optional final message
+            if (exitMessage != null) {
+                speechCoordinator.speakText(exitMessage)
+                delay(2000) // Give TTS time to finish
+            }
+
+            // 3. Stop the service
+            stopSelf()
+
+    }
     override fun onDestroy() {
         super.onDestroy()
         Log.d("ConvAgent", "Service onDestroy")
-        
-        // Extract memories from the conversation before destroying the service
-        if (conversationHistory.size > 1) { // Only if there's actual conversation
-            MemoryExtractor.extractAndStoreMemories(conversationHistory, memoryManager, serviceScope)
-        }
-        
         removeClarificationQuestions()
         serviceScope.cancel()
         ttsManager.setCaptionsEnabled(false)

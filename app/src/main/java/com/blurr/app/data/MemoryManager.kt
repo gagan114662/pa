@@ -18,12 +18,19 @@ class MemoryManager(private val context: Context) {
     private val memoryDao = database.memoryDao()
     
     /**
-     * Add a new memory with embedding
+     * Add a new memory with embedding, checking for duplicates first
      */
     suspend fun addMemory(originalText: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
                 Log.d("MemoryManager", "Adding memory: ${originalText.take(100)}...")
+                
+                // Check for similar existing memories first
+                val similarMemories = findSimilarMemories(originalText, similarityThreshold = 0.85f)
+                if (similarMemories.isNotEmpty()) {
+                    Log.d("MemoryManager", "Found ${similarMemories.size} similar memories, skipping duplicate")
+                    return@withContext true // Return true since we're avoiding a duplicate
+                }
                 
                 // Generate embedding for the text
                 val embedding = EmbeddingService.generateEmbedding(
@@ -51,7 +58,7 @@ class MemoryManager(private val context: Context) {
                 return@withContext true
                 
             } catch (e: Exception) {
-                Log.e("MemoryManager", "Error adding memory", e)
+                Log.e("MemoryManager", "Error adding memory $e", e)
                 return@withContext false
             }
         }
@@ -135,12 +142,84 @@ class MemoryManager(private val context: Context) {
     }
     
     /**
+     * Get all memories as a list
+     */
+    suspend fun getAllMemoriesList(): List<Memory> {
+        return withContext(Dispatchers.IO) {
+            memoryDao.getAllMemoriesList()
+        }
+    }
+    
+    /**
      * Delete all memories
      */
     suspend fun clearAllMemories() {
         withContext(Dispatchers.IO) {
             memoryDao.deleteAllMemories()
             Log.d("MemoryManager", "All memories cleared")
+        }
+    }
+    
+    /**
+     * Delete a specific memory by ID
+     */
+    suspend fun deleteMemoryById(id: Long): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                memoryDao.deleteMemoryById(id)
+                Log.d("MemoryManager", "Successfully deleted memory with ID: $id")
+                true
+            } catch (e: Exception) {
+                Log.e("MemoryManager", "Error deleting memory with ID: $id", e)
+                false
+            }
+        }
+    }
+    
+    /**
+     * Find memories similar to the given text
+     */
+    suspend fun findSimilarMemories(text: String, similarityThreshold: Float = 0.8f): List<String> {
+        return withContext(Dispatchers.IO) {
+            try {
+                // Generate embedding for the query text
+                val queryEmbedding = EmbeddingService.generateEmbedding(
+                    text = text,
+                    taskType = "RETRIEVAL_QUERY"
+                )
+                
+                if (queryEmbedding == null) {
+                    Log.e("MemoryManager", "Failed to generate embedding for similarity check")
+                    return@withContext emptyList()
+                }
+                
+                // Get all memories from database
+                val allMemories = memoryDao.getAllMemoriesList()
+                
+                if (allMemories.isEmpty()) {
+                    return@withContext emptyList()
+                }
+                
+                // Calculate similarities and find similar memories
+                val similarMemories = allMemories.mapNotNull { memory ->
+                    val memoryEmbedding = parseEmbeddingFromJson(memory.embedding)
+                    val similarity = calculateCosineSimilarity(queryEmbedding, memoryEmbedding)
+                    
+                    if (similarity >= similarityThreshold) {
+                        Log.d("MemoryManager", "Found similar memory (similarity: $similarity): ${memory.originalText.take(50)}...")
+                        memory.originalText
+                    } else {
+                        null
+                    }
+                }
+                
+                Log.d("MemoryManager", "Found ${similarMemories.size} similar memories with threshold $similarityThreshold")
+                return@withContext similarMemories
+                
+            } catch (e: Exception) {
+                Log.e("MemoryManager", "Error finding similar memories", e)
+                return@withContext emptyList()
+            }
         }
     }
     
