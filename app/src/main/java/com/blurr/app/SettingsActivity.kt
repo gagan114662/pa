@@ -227,9 +227,10 @@ class SettingsActivity : AppCompatActivity() {
 
     private suspend fun startWakeWordService() {
         val usePorcupine = wakeWordEngineGroup.checkedRadioButtonId == R.id.porcupineEngineRadio
-        if (usePorcupine && !isPorcupineAccessKeyConfigured()) {
-            Toast.makeText(this, getString(R.string.porcupine_access_key_required), Toast.LENGTH_LONG).show()
-            return
+        if (usePorcupine) {
+            // For Porcupine, we'll let the service handle the key fetching
+            // The service will automatically fall back to STT if the key can't be obtained
+            Log.d("SettingsActivity", "Starting Porcupine wake word service - key will be fetched automatically")
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             val serviceIntent = Intent(this, EnhancedWakeWordService::class.java).apply {
@@ -277,15 +278,6 @@ class SettingsActivity : AppCompatActivity() {
     private fun saveWakeWordEngine(checkedId: Int) {
         sharedPreferences.edit {
             putInt(KEY_SELECTED_WAKE_WORD_ENGINE, checkedId)
-        }
-    }
-
-    private fun isPorcupineAccessKeyConfigured(): Boolean {
-        return try {
-            val accessKey = BuildConfig.PICOVOICE_ACCESS_KEY
-            accessKey.isNotEmpty() && accessKey != "your_actual_access_key_here"
-        } catch (e: Exception) {
-            false
         }
     }
 }

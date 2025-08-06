@@ -55,6 +55,12 @@ android {
             val googleTtsApiKey = localProperties.getProperty("GOOGLE_TTS_API_KEY") ?: ""
             buildConfigField("String", "GOOGLE_TTS_API_KEY", "\"$googleTtsApiKey\"")
 
+            val googlecloudGatewayPicovoice = localProperties.getProperty("GCLOUD_GATEWAY_PICOVOICE_KEY") ?: ""
+            buildConfigField("String", "GCLOUD_GATEWAY_PICOVOICE_KEY", "\"$googlecloudGatewayPicovoice\"")
+
+            val googlecloudGatewayURL = localProperties.getProperty("GCLOUD_GATEWAY_URL") ?: ""
+            buildConfigField("String", "GCLOUD_GATEWAY_URL", "\"$googlecloudGatewayURL\"")
+
         }
         debug {
             // Also add it to the 'debug' block so it works when you run from Android Studio
@@ -74,6 +80,12 @@ android {
             val googleTtsApiKey = localProperties.getProperty("GOOGLE_TTS_API_KEY") ?: ""
             buildConfigField("String", "GOOGLE_TTS_API_KEY", "\"$googleTtsApiKey\"")
             buildConfigField("String", "SHA1_FINGERPRINT", "\"$debugSha1\"")
+
+            val googlecloudGatewayPicovoice = localProperties.getProperty("GCLOUD_GATEWAY_PICOVOICE_KEY") ?: ""
+            buildConfigField("String", "GCLOUD_GATEWAY_PICOVOICE_KEY", "\"$googlecloudGatewayPicovoice\"")
+
+            val googlecloudGatewayURL = localProperties.getProperty("GCLOUD_GATEWAY_URL") ?: ""
+            buildConfigField("String", "GCLOUD_GATEWAY_URL", "\"$googlecloudGatewayURL\"")
 
         }
     }

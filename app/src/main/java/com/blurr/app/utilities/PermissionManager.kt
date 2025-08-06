@@ -211,13 +211,4 @@ class PermissionManager(private val activity: AppCompatActivity) {
         
         return status.joinToString(", ")
     }
-    fun isPorcupineAccessKeyConfigured(): Boolean {
-        // Check if the access key is configured in BuildConfig
-        return try {
-            val accessKey = BuildConfig.PICOVOICE_ACCESS_KEY
-            accessKey.isNotEmpty() && accessKey != "YOUR_PICOVOICE_ACCESS_KEY_HERE"
-        } catch (e: Exception) {
-            false
-        }
-    }
 } 

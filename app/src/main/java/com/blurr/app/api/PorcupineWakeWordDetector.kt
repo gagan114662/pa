@@ -5,7 +5,12 @@ import ai.picovoice.porcupine.PorcupineManagerCallback
 import ai.picovoice.porcupine.PorcupineManagerErrorCallback
 import android.content.Context
 import android.util.Log
-import com.blurr.app.BuildConfig
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class PorcupineWakeWordDetector(
     private val context: Context,
@@ -15,19 +20,11 @@ class PorcupineWakeWordDetector(
     private var sttDetector: WakeWordDetector? = null
     private var isListening = false
     private var useSTTFallback = false
+    private val keyManager = PicovoiceKeyManager(context)
+    private var coroutineScope: CoroutineScope? = null
 
     companion object {
         private const val TAG = "PorcupineWakeWordDetector"
-        // You'll need to replace this with your actual Picovoice AccessKey
-        // Get from BuildConfig or environment variable
-        private val ACCESS_KEY: String = try {
-            // Try to get from BuildConfig first
-            BuildConfig.PICOVOICE_ACCESS_KEY
-        } catch (e: Exception) {
-            Log.e(TAG, "Error getting access key from BuildConfig: ${e.message}")
-            // Fallback to environment variable or default
-            System.getenv("PICOVOICE_ACCESS_KEY") ?: "YOUR_PICOVOICE_ACCESS_KEY_HERE"
-        }
     }
 
     fun start() {
@@ -36,13 +33,28 @@ class PorcupineWakeWordDetector(
             return
         }
 
-        // Check if access key is valid
-        if (ACCESS_KEY.isEmpty() || ACCESS_KEY == "YOUR_PICOVOICE_ACCESS_KEY_HERE") {
-            Log.e(TAG, "Invalid or missing Picovoice access key. Falling back to STT-based detection.")
-            startSTTFallback()
-            return
-        }
+        // Create a new coroutine scope for this start operation
+        coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+        // Start the key fetching process asynchronously
+        coroutineScope?.launch {
+            try {
+                val accessKey = keyManager.getAccessKey()
+                if (accessKey != null) {
+                    Log.d(TAG, "Successfully obtained Picovoice access key")
+                    startPorcupineWithKey(accessKey)
+                } else {
+                    Log.e(TAG, "Failed to obtain Picovoice access key. Falling back to STT-based detection.")
+                    startSTTFallback()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error getting access key: ${e.message}")
+                startSTTFallback()
+            }
+        }
+    }
+
+    private suspend fun startPorcupineWithKey(accessKey: String) = withContext(Dispatchers.Main) {
         try {
             // Create the wake word callback
             val wakeWordCallback = PorcupineManagerCallback { keywordIndex ->
@@ -63,7 +75,7 @@ class PorcupineWakeWordDetector(
 
             // Build and start PorcupineManager
             porcupineManager = PorcupineManager.Builder()
-                .setAccessKey(ACCESS_KEY)
+                .setAccessKey(accessKey)
                 .setKeywordPaths(arrayOf("Panda_en_android_v3_0_0.ppn"))
                 .setSensitivity(0.5f) // Set sensitivity to 0.5 for better detection
                 .setErrorCallback(errorCallback)
@@ -100,6 +112,10 @@ class PorcupineWakeWordDetector(
             }
             isListening = false
             useSTTFallback = false
+            
+            // Cancel the coroutine scope
+            coroutineScope?.cancel()
+            coroutineScope = null
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping wake word detection: ${e.message}")
         }

@@ -111,24 +111,25 @@ class ConversationalAgentService : Service() {
     private suspend fun getPersonalizedGreeting(): String {
         try {
             // Search for name-related memories
-            val nameMemories = memoryManager.searchMemories("name", topK = 10)
+            // val nameMemories = memoryManager.searchMemories("name", topK = 10)
+            //TODO: Uncomment this when we have a way to get the user's name from the memories
             
-            if (nameMemories.isNotEmpty()) {
-                // Look for memories that contain name information
-                val nameMemory = nameMemories.find { memory ->
-                    memory.lowercase().contains("name") && 
-                    (memory.lowercase().contains("is") || memory.lowercase().contains("called"))
-                }
+            // if (nameMemories.isNotEmpty()) {
+            //     // Look for memories that contain name information
+            //     val nameMemory = nameMemories.find { memory ->
+            //         memory.lowercase().contains("name") && 
+            //         (memory.lowercase().contains("is") || memory.lowercase().contains("called"))
+            //     }
                 
-                if (nameMemory != null) {
-                    // Extract the name from the memory
-                    val name = extractNameFromMemory(nameMemory)
-                    if (name.isNotEmpty()) {
-                        Log.d("ConvAgent", "Found user name: $name")
-                        return "Hello $name! How can I help you today?"
-                    }
-                }
-            }
+            //     if (nameMemory != null) {
+            //         // Extract the name from the memory
+            //         val name = extractNameFromMemory(nameMemory)
+            //         if (name.isNotEmpty()) {
+            //             Log.d("ConvAgent", "Found user name: $name")
+            //             return "Hello $name! How can I help you today?"
+            //         }
+            //     }
+            // }
             
             // Fallback to generic greeting
             Log.d("ConvAgent", "No name found in memories, using generic greeting")
@@ -384,15 +385,16 @@ class ConversationalAgentService : Service() {
             if (lastUserMessage.isNotEmpty()) {
                 Log.d("ConvAgent", "Searching for memories relevant to: ${lastUserMessage.take(100)}...")
                 
-                val relevantMemories = memoryManager.searchMemories(lastUserMessage, topK = 5) // Get more memories to filter from
-                
+                var relevantMemories = memoryManager.searchMemories(lastUserMessage, topK = 5).toMutableList() // Get more memories to filter from
+                val nameMemories = memoryManager.searchMemories("name", topK = 2)
+                relevantMemories.addAll(nameMemories)
                 if (relevantMemories.isNotEmpty()) {
                     Log.d("ConvAgent", "Found ${relevantMemories.size} relevant memories")
                     
                     // Filter out memories that have already been used in this conversation
                     val newMemories = relevantMemories.filter { memory ->
                         !usedMemories.contains(memory)
-                    }.take(3) // Limit to top 3 new memories
+                    }.take(20) // Limit to top 20 new memories
                     
                     if (newMemories.isNotEmpty()) {
                         Log.d("ConvAgent", "Adding ${newMemories.size} new memories to context")
@@ -642,17 +644,14 @@ class ConversationalAgentService : Service() {
         }
     }
     private suspend fun gracefulShutdown(exitMessage: String? = null) {
-
+            if (exitMessage != null) {
+                speechCoordinator.speakText(exitMessage)
+                delay(2000) // Give TTS time to finish
+            }
             // 1. Extract memories from the conversation before ending
             if (conversationHistory.size > 1) {
                 Log.d("ConvAgent", "Extracting memories before shutdown.")
                 MemoryExtractor.extractAndStoreMemories(conversationHistory, memoryManager, usedMemories)
-            }
-
-            // 2. Speak an optional final message
-            if (exitMessage != null) {
-                speechCoordinator.speakText(exitMessage)
-                delay(2000) // Give TTS time to finish
             }
 
             // 3. Stop the service
