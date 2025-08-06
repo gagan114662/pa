@@ -162,7 +162,7 @@ class SettingsActivity : AppCompatActivity() {
 
         wakeWordEngineGroup.setOnCheckedChangeListener { _, checkedId ->
             saveWakeWordEngine(checkedId)
-            val engineName = if (checkedId == R.id.sttEngineRadio) "STT" else "Porcupine"
+            val engineName = "Porcupine"
             if (!isInitialLoad) {
                 Toast.makeText(this, "Wake Word Engine set to $engineName", Toast.LENGTH_SHORT).show()
             }
@@ -226,19 +226,12 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private suspend fun startWakeWordService() {
-        val usePorcupine = wakeWordEngineGroup.checkedRadioButtonId == R.id.porcupineEngineRadio
-        if (usePorcupine) {
-            // For Porcupine, we'll let the service handle the key fetching
-            // The service will automatically fall back to STT if the key can't be obtained
-            Log.d("SettingsActivity", "Starting Porcupine wake word service - key will be fetched automatically")
-        }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             val serviceIntent = Intent(this, EnhancedWakeWordService::class.java).apply {
-                putExtra(EnhancedWakeWordService.EXTRA_USE_PORCUPINE, usePorcupine)
+                putExtra(EnhancedWakeWordService.EXTRA_USE_PORCUPINE, true) // Always use Porcupine
             }
             ContextCompat.startForegroundService(this, serviceIntent)
-            val engineName = if (usePorcupine) "Porcupine" else "STT"
-            Toast.makeText(this, getString(R.string.wake_word_enabled, engineName), Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.wake_word_enabled, "Porcupine"), Toast.LENGTH_SHORT).show()
             updateUIState()
         } else {
             requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -258,7 +251,7 @@ class SettingsActivity : AppCompatActivity() {
         val savedVisionId = sharedPreferences.getInt(KEY_SELECTED_VISION_MODE, R.id.xmlModeRadio)
         visionModeGroup.check(savedVisionId)
 
-        val savedWakeWordId = sharedPreferences.getInt(KEY_SELECTED_WAKE_WORD_ENGINE, R.id.sttEngineRadio)
+        val savedWakeWordId = sharedPreferences.getInt(KEY_SELECTED_WAKE_WORD_ENGINE, R.id.porcupineEngineRadio) // Assuming default is Porcupine
         wakeWordEngineGroup.check(savedWakeWordId)
     }
 

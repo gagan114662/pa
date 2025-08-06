@@ -16,12 +16,10 @@ import com.blurr.app.ConversationalAgentService
 import com.blurr.app.MainActivity
 import com.blurr.app.R
 import com.blurr.app.api.PorcupineWakeWordDetector
-import com.blurr.app.api.WakeWordDetector
 
 class EnhancedWakeWordService : Service() {
 
     private var porcupineDetector: PorcupineWakeWordDetector? = null
-    private var sttDetector: WakeWordDetector? = null
     private var usePorcupine = false
 
     companion object {
@@ -54,7 +52,7 @@ class EnhancedWakeWordService : Service() {
         val engineName = if (usePorcupine) "Porcupine" else "STT"
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Blurr Wake Word")
-            .setContentText("Listening for 'Panda' with $engineName engine...")
+            .setContentText("Listening for 'Panda' with Porcupine engine...")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)
             .build()
@@ -80,26 +78,32 @@ class EnhancedWakeWordService : Service() {
             }
         }
 
+        val onApiFailure: () -> Unit = {
+            Log.d("EnhancedWakeWordService", "Porcupine API failed, starting floating button service")
+            // Start the floating button service when API fails
+            try {
+                val floatingButtonIntent = Intent(this, FloatingPandaButtonService::class.java)
+                startService(floatingButtonIntent)
+                Log.d("EnhancedWakeWordService", "Floating Panda Button Service started due to API failure")
+            } catch (e: Exception) {
+                Log.e("EnhancedWakeWordService", "Error starting floating button service", e)
+            }
+        }
+
         try {
             if (usePorcupine) {
-                Log.d("EnhancedWakeWordService", "Starting Porcupine wake word detection")
-                porcupineDetector = PorcupineWakeWordDetector(this, onWakeWordDetected)
+                Log.d("EnhancedWakeWordService", "Using Porcupine wake word detection")
+                porcupineDetector = PorcupineWakeWordDetector(this, onWakeWordDetected, onApiFailure)
                 porcupineDetector?.start()
             } else {
-                Log.d("EnhancedWakeWordService", "Starting STT-based wake word detection")
-                sttDetector = WakeWordDetector(this, onWakeWordDetected)
-                sttDetector?.start()
+                Log.d("EnhancedWakeWordService", "Using Porcupine wake word detection")
+                porcupineDetector = PorcupineWakeWordDetector(this, onWakeWordDetected, onApiFailure)
+                porcupineDetector?.start()
             }
         } catch (e: Exception) {
             Log.e("EnhancedWakeWordService", "Error starting wake word detection: ${e.message}")
-            // Fallback to STT-based detection if there's any error
-            try {
-                Log.d("EnhancedWakeWordService", "Falling back to STT-based wake word detection")
-                sttDetector = WakeWordDetector(this, onWakeWordDetected)
-                sttDetector?.start()
-            } catch (fallbackError: Exception) {
-                Log.e("EnhancedWakeWordService", "Error in fallback wake word detection: ${fallbackError.message}")
-            }
+            // If there's any error, start the floating button service
+            onApiFailure()
         }
     }
 
@@ -110,9 +114,6 @@ class EnhancedWakeWordService : Service() {
         
         porcupineDetector?.stop()
         porcupineDetector = null
-        
-        sttDetector?.stop()
-        sttDetector = null
         
         isRunning = false
         Log.d("EnhancedWakeWordService", "Service destroyed, isRunning set to false")

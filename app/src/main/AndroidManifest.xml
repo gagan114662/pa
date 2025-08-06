@@ -103,11 +103,6 @@
             android:exported="false"
             android:foregroundServiceType="specialUse" />
 
-        <service android:name=".services.WakeWordService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="specialUse" />
-
         <service android:name=".services.EnhancedWakeWordService"
             android:enabled="true"
             android:exported="false"
@@ -118,6 +113,11 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <service
+            android:name=".services.FloatingPandaButtonService"
+            android:enabled="true"
+            android:exported="false" />
     </application>
 
 </manifest>
