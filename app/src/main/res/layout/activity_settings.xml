@@ -166,17 +166,6 @@
                 android:orientation="vertical">
 
                 <RadioButton
-                    android:id="@+id/sttEngineRadio"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:buttonTint="#5880F7"
-                    android:checked="false"
-                    android:paddingStart="8dp"
-                    android:text="@string/stt_engine"
-                    android:textColor="#CECECE"
-                    tools:ignore="RtlSymmetry" />
-
-                <RadioButton
                     android:id="@+id/porcupineEngineRadio"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
