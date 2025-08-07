@@ -4,9 +4,17 @@
 
 ---
 
+## Demos Panda Doing stuff for you
+
+https://github.com/user-attachments/assets/cf76bb00-2bf4-4274-acad-d9f4c0d47188
+
+
+
 Demo-> Text My Brother Happy Birthday
 
 https://github.com/user-attachments/assets/bac5726a-64b3-4cbf-b116-0ebc369bcec0
+
+
 
 
 
