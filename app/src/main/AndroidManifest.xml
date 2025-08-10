@@ -38,6 +38,11 @@
             </intent-filter>
         </activity>
         <activity
+            android:name=".OnboardingActivity"
+            android:exported="false"
+            android:label="Onboarding"
+            android:theme="@style/Theme.Blurr" />
+        <activity
             android:name=".ChatActivity"
             android:exported="true"
             android:label="@string/app_name"

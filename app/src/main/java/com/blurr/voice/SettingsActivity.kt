@@ -17,12 +17,14 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
+import android.util.Patterns
 import com.blurr.voice.agent.VisionMode
 import com.blurr.voice.api.GoogleTts
 import com.blurr.voice.api.TTSVoice
 import com.blurr.voice.services.EnhancedWakeWordService
 import com.blurr.voice.utilities.SpeechCoordinator
 import com.blurr.voice.utilities.VoicePreferenceManager
+import com.blurr.voice.utilities.UserProfileManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -39,6 +41,9 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var wakeWordEngineGroup: RadioGroup
     private lateinit var visionModeDescription: TextView
     private lateinit var wakeWordButton: Button
+    private lateinit var editUserName: android.widget.EditText
+    private lateinit var editUserEmail: android.widget.EditText
+    private lateinit var buttonSaveProfile: Button
 
     private lateinit var sc: SpeechCoordinator
     private lateinit var sharedPreferences: SharedPreferences
@@ -97,9 +102,19 @@ class SettingsActivity : AppCompatActivity() {
         visionModeDescription = findViewById(R.id.visionModeDescription)
         wakeWordButton = findViewById(R.id.wakeWordButton)
         wakeWordEngineGroup = findViewById(R.id.wakeWordEngineGroup)
+        editUserName = findViewById(R.id.editUserName)
+        editUserEmail = findViewById(R.id.editUserEmail)
+//        buttonSaveProfile = findViewById(R.id.buttonSaveProfile)
 
         setupClickListeners()
         setupVoicePicker()
+
+        // Prefill profile fields from saved values
+        kotlin.runCatching {
+            val pm = UserProfileManager(this)
+            editUserName.setText(pm.getName() ?: "")
+            editUserEmail.setText(pm.getEmail() ?: "")
+        }
     }
 
     private fun setupVoicePicker() {
@@ -129,6 +144,19 @@ class SettingsActivity : AppCompatActivity() {
                 }
             }
         }
+
+//        buttonSaveProfile.setOnClickListener {
+//            val name = editUserName.text.toString().trim()
+//            val email = editUserEmail.text.toString().trim()
+//            // Both inputs are optional; validate email only if provided
+//            if (email.isNotEmpty() && !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+//                Toast.makeText(this, "Please enter a valid email or leave it blank", Toast.LENGTH_SHORT).show()
+//                return@setOnClickListener
+//            }
+//            val pm = UserProfileManager(this)
+//            pm.saveProfile(name, email)
+//            Toast.makeText(this, "Profile saved", Toast.LENGTH_SHORT).show()
+//        }
 
     }
 

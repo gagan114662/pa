@@ -31,6 +31,7 @@ import com.blurr.voice.agent.AgentConfig
 import com.blurr.voice.utilities.TTSManager
 import com.blurr.voice.utilities.STTManager
 import com.blurr.voice.utilities.UserIdManager
+import com.blurr.voice.utilities.UserProfileManager
 import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
 import com.blurr.voice.agent.VisionHelper
@@ -90,6 +91,12 @@ class MainActivity : AppCompatActivity() {
 
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        // One-time onboarding for name and email
+        val profileManager = UserProfileManager(this)
+        if (!profileManager.isProfileComplete()) {
+            startActivity(Intent(this, OnboardingActivity::class.java))
+        }
 
         val userIdManager = UserIdManager(applicationContext)
         userId = userIdManager.getOrCreateUserId()
