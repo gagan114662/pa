@@ -11,6 +11,10 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
 import com.blurr.voice.utilities.NetworkConnectivityManager
+import com.blurr.voice.utilities.UserIdManager
+import com.blurr.voice.utilities.UserProfileManager
+import okhttp3.internal.platform.PlatformRegistry.applicationContext
+import java.util.UUID
 
 /**
  * Manages the Picovoice access key by fetching it from the API and caching it locally.
@@ -26,8 +30,8 @@ class PicovoiceKeyManager(private val context: Context) {
         private const val API_URL = BuildConfig.GCLOUD_GATEWAY_URL
         private const val API_KEY_HEADER = "x-api-key"
         private const val API_KEY_VALUE = BuildConfig.GCLOUD_GATEWAY_PICOVOICE_KEY
+        private const val DEVICE_ID_HEADER = "x-device-id"
     }
-    
     private val sharedPreferences: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -63,7 +67,7 @@ class PicovoiceKeyManager(private val context: Context) {
             return@withContext null
         }
     }
-    
+
     /**
      * Fetches the access key from the API endpoint
      */
@@ -80,12 +84,20 @@ class PicovoiceKeyManager(private val context: Context) {
                 com.blurr.voice.utilities.NetworkNotifier.notifyOffline()
                 return@withContext null
             }
+
+            var userEmail = UserProfileManager(context).getEmail()
+
+            if(userEmail==null){
+                userEmail = UserIdManager(context).getOrCreateUserId()
+                Log.d(TAG,userEmail)
+            }
             val request = Request.Builder()
                 .url(API_URL)
                 .header(API_KEY_HEADER, API_KEY_VALUE)
+                .header(DEVICE_ID_HEADER, userEmail)
                 .get()
                 .build()
-            
+
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     Log.e(TAG, "API request failed with code: ${response.code}")

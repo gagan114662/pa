@@ -4,7 +4,10 @@ import android.content.Context
 import android.util.Log
 import com.blurr.voice.api.EmbeddingService
 import com.blurr.voice.MyApplication
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 
@@ -15,20 +18,23 @@ class MemoryManager(private val context: Context) {
     
     private val database = AppDatabase.getDatabase(context)
     private val memoryDao = database.memoryDao()
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     
     /**
      * Add a new memory with embedding, checking for duplicates first
      */
-    suspend fun addMemory(originalText: String): Boolean {
+    suspend fun addMemory(originalText: String, checkDuplicates: Boolean = true): Boolean {
         return withContext(Dispatchers.IO) {
             try {
                 Log.d("MemoryManager", "Adding memory: ${originalText.take(100)}...")
                 
-                // Check for similar existing memories first
-                val similarMemories = findSimilarMemories(originalText, similarityThreshold = 0.85f)
-                if (similarMemories.isNotEmpty()) {
-                    Log.d("MemoryManager", "Found ${similarMemories.size} similar memories, skipping duplicate")
-                    return@withContext true // Return true since we're avoiding a duplicate
+                if (checkDuplicates) {
+                    // Check for similar existing memories first
+                    val similarMemories = findSimilarMemories(originalText, similarityThreshold = 0.85f)
+                    if (similarMemories.isNotEmpty()) {
+                        Log.d("MemoryManager", "Found ${similarMemories.size} similar memories, skipping duplicate")
+                        return@withContext true // Return true since we're avoiding a duplicate
+                    }
                 }
                 
                 // Generate embedding for the text
@@ -59,6 +65,21 @@ class MemoryManager(private val context: Context) {
             } catch (e: Exception) {
                 Log.e("MemoryManager", "Error adding memory $e", e)
                 return@withContext false
+            }
+        }
+    }
+
+    /**
+     * Fire-and-forget version of addMemory that is not tied to an Activity scope.
+     * Uses an internal SupervisorJob so it won't be cancelled when a caller finishes.
+     */
+    fun addMemoryFireAndForget(originalText: String, checkDuplicates: Boolean = true) {
+        ioScope.launch {
+            try {
+                val result = addMemory(originalText, checkDuplicates)
+                Log.d("MemoryManager", "Fire-and-forget addMemory result=$result")
+            } catch (e: Exception) {
+                Log.e("MemoryManager", "Fire-and-forget addMemory error", e)
             }
         }
     }
