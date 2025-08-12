@@ -516,6 +516,17 @@ class ScreenInteractionService : AccessibilityService() {
                     drawDebugBoundingBoxes(simplifiedElements)
                 }
 
+                // Inform user with a bottom toast (no screenshots taken)
+                try {
+                    Handler(Looper.getMainLooper()).post {
+                        android.widget.Toast.makeText(
+                            this@ScreenInteractionService,
+                            "We just read your screen structure (no screenshots) of single frame so we can automate your task.",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                } catch (_: Exception) { }
+
                 if (pureXML) {
                     return@withContext rawXml
                 }

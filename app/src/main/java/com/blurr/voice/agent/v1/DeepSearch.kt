@@ -1,4 +1,4 @@
-package com.blurr.voice.agent
+package com.blurr.voice.agent.v1
 
 import com.blurr.voice.BuildConfig
 import com.blurr.voice.api.GeminiApi

@@ -1,4 +1,4 @@
-package com.blurr.voice.agent
+package com.blurr.voice.agent.v1
 
 import android.content.Context
 
@@ -11,9 +11,9 @@ data class AgentConfig(
     val visionMode: VisionMode,
     val apiKey: String,
     val maxIterations: Int = 200000,
-    val maxConsecutiveFailures: Int = 3,
-    val maxRepetitiveActions: Int = 3,
-    val errorThreshold: Int = 2,
+    val maxConsecutiveFailures: Int = 100,
+    val maxRepetitiveActions: Int = 100,
+    val errorThreshold: Int = 5,
     val context: Context,
     val enableDirectAppOpening: Boolean = false // Debug flag for direct app opening
 ) {

@@ -1,8 +1,8 @@
-package com.blurr.voice.agent.tips
+package com.blurr.voice.agent.v1.tips
 
-import com.blurr.voice.agent.AgentConfig
-import com.blurr.voice.agent.BaseAgent
-import com.blurr.voice.agent.InfoPool
+import com.blurr.voice.agent.v1.AgentConfig
+import com.blurr.voice.agent.v1.BaseAgent
+import com.blurr.voice.agent.v1.InfoPool
 import com.google.ai.client.generativeai.type.TextPart
 
 class ExperienceRetrieverTips : BaseAgent() {

@@ -1,8 +1,8 @@
 package com.blurr.voice.api
 
 import android.content.Context
-import com.blurr.voice.agent.AgentConfig
-import com.blurr.voice.agent.ClickableInfo
+import com.blurr.voice.agent.v1.AgentConfig
+import com.blurr.voice.agent.v1.ClickableInfo
 import org.json.JSONArray
 import org.json.JSONObject
 import android.graphics.Bitmap

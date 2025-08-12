@@ -9,11 +9,11 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import com.blurr.voice.BuildConfig
-import com.blurr.voice.agent.AgentConfigFactory
-import com.blurr.voice.agent.InfoPool
-import com.blurr.voice.agent.Manager
-import com.blurr.voice.agent.Operator
-import com.blurr.voice.agent.VisionHelper
+import com.blurr.voice.agent.v1.AgentConfigFactory
+import com.blurr.voice.agent.v1.InfoPool
+import com.blurr.voice.agent.v1.Manager
+import com.blurr.voice.agent.v1.Operator
+import com.blurr.voice.agent.v1.VisionHelper
 import com.blurr.voice.api.Eyes
 import com.blurr.voice.api.Finger
 import com.blurr.voice.api.Retina

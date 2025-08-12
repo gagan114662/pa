@@ -16,11 +16,11 @@ import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
-import com.blurr.voice.agent.AgentConfig
-import com.blurr.voice.agent.ClarificationAgent
-import com.blurr.voice.agent.InfoPool
-import com.blurr.voice.agent.VisionHelper
-import com.blurr.voice.agent.VisionMode
+import com.blurr.voice.agent.v1.AgentConfig
+import com.blurr.voice.agent.v1.ClarificationAgent
+import com.blurr.voice.agent.v1.InfoPool
+import com.blurr.voice.agent.v1.VisionHelper
+import com.blurr.voice.agent.v1.VisionMode
 import com.blurr.voice.services.AgentTaskService
 import com.blurr.voice.utilities.SpeechCoordinator
 import android.os.Handler
