@@ -98,8 +98,6 @@ class MainActivity : AppCompatActivity() {
         if (!profileManager.isProfileComplete()) {
             startActivity(Intent(this, OnboardingActivity::class.java))
         }
-        val test = SystemPrompt("heeey")
-        Log.d("SYSTEM_TEST", test.getSystemMessage().toString())
         val userIdManager = UserIdManager(applicationContext)
         userId = userIdManager.getOrCreateUserId()
         println(userId)

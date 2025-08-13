@@ -124,4 +124,49 @@ class Finger(private val context: Context) {
         Log.d(TAG, "Performing 'App Switch' action")
         service?.performRecents()
     }
+    /**
+     * Scrolls the screen down by a given number of pixels.
+     * This performs a swipe from bottom to top.
+     *
+     * @param pixels The number of pixels to scroll.
+     * @param duration The duration of the swipe in milliseconds.
+     */
+    fun scrollDown(pixels: Int, duration: Int = 500) {
+        val displayMetrics = context.resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels
+        val screenHeight = displayMetrics.heightPixels
+
+        // Define swipe path in the middle of the screen
+        val x = screenWidth / 2
+        // Start swipe from 80% down the screen to avoid navigation bars
+        val y1 = (screenHeight * 0.8).toInt()
+        // Calculate end point, ensuring it doesn't go below 0
+        val y2 = (y1 - pixels).coerceAtLeast(0)
+
+        Log.d(TAG, "Scrolling down by $pixels pixels: swipe from ($x, $y1) to ($x, $y2)")
+        swipe(x, y1, x, y2, duration)
+    }
+
+    /**
+     * Scrolls the screen up by a given number of pixels.
+     * This performs a swipe from top to bottom.
+     *
+     * @param pixels The number of pixels to scroll.
+     * @param duration The duration of the swipe in milliseconds.
+     */
+    fun scrollUp(pixels: Int, duration: Int = 500) {
+        val displayMetrics = context.resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels
+        val screenHeight = displayMetrics.heightPixels
+
+        // Define swipe path in the middle of the screen
+        val x = screenWidth / 2
+        // Start swipe from 20% down the screen to avoid status bars
+        val y1 = (screenHeight * 0.2).toInt()
+        // Calculate end point, ensuring it doesn't go beyond screen height
+        val y2 = (y1 + pixels).coerceAtMost(screenHeight)
+
+        Log.d(TAG, "Scrolling up by $pixels pixels: swipe from ($x, $y1) to ($x, $y2)")
+        swipe(x, y1, x, y2, duration)
+    }
 }
