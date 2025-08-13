@@ -37,6 +37,7 @@ import androidx.core.net.toUri
 import com.blurr.voice.agent.v1.VisionHelper
 import com.blurr.voice.utilities.getReasoningModelApiResponse
 import android.view.View
+import com.blurr.voice.agent.v2.prompts.SystemPrompt
 import com.blurr.voice.services.AgentTaskService
 import com.blurr.voice.utilities.PermissionManager
 
@@ -97,7 +98,8 @@ class MainActivity : AppCompatActivity() {
         if (!profileManager.isProfileComplete()) {
             startActivity(Intent(this, OnboardingActivity::class.java))
         }
-
+        val test = SystemPrompt("heeey")
+        Log.d("SYSTEM_TEST", test.getSystemMessage().toString())
         val userIdManager = UserIdManager(applicationContext)
         userId = userIdManager.getOrCreateUserId()
         println(userId)
