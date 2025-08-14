@@ -2,7 +2,9 @@ package com.blurr.voice.api
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import com.blurr.voice.ScreenInteractionService
 
 /**
@@ -88,14 +90,17 @@ class Finger(private val context: Context) {
     /**
      * Types text into the focused input field. This is now much more efficient.
      */
+    @RequiresApi(Build.VERSION_CODES.R)
     fun type(text: String) {
         Log.d(TAG, "Typing text: $text")
         service?.typeTextInFocusedField(text)
+        this.enter()
     }
 
     /**
      * Simulates pressing the 'Enter' key.
      */
+    @RequiresApi(Build.VERSION_CODES.R)
     fun enter() {
         Log.d(TAG, "Performing 'Enter' action")
         service?.performEnter()

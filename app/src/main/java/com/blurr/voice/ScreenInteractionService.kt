@@ -29,6 +29,7 @@ import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import com.blurr.voice.utilities.TTSManager
 import com.blurr.voice.utilities.TtsVisualizer
+import com.blurr.voice.v2.perception.SemanticParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -51,6 +52,12 @@ private data class SimplifiedElement(
     val center: Point,
     val isClickable: Boolean,
     val className: String
+)
+
+data class RawScreenData(
+    val xml: String,
+    val pixelsAbove: Int,
+    val pixelsBelow: Int
 )
 
 class ScreenInteractionService : AccessibilityService() {
@@ -505,9 +512,9 @@ class ScreenInteractionService : AccessibilityService() {
 
                 // Log.d("APPMAPXML", rawXml)
 
-                // val semanticParser = SemanticParser(this@ScreenInteractionService)
-                // val simplifiedJson = semanticParser.parse(rawXml, screenWidth, screenHeight)
-                // Log.d("APPMAP", "Screen Width: $screenWidth, Screen Height: $screenHeight\n$simplifiedJson")
+                 val semanticParser = SemanticParser()
+                 val simplifiedJson = semanticParser.toHierarchicalString(rawXml)
+                 Log.d("APPMAP", "Screen Width: $screenWidth, Screen Height: $screenHeight\n$simplifiedJson")
 //                // 1. Parse the raw XML into a structured list.
                 val simplifiedElements = parseXmlToSimplifiedElements(rawXml)
                 println("SIZEEEE : " + simplifiedElements.size)
@@ -684,18 +691,128 @@ class ScreenInteractionService : AccessibilityService() {
         performGlobalAction(GLOBAL_ACTION_RECENTS)
     }
 
-    /**
-     * Simulates an 'Enter' key press on the focused element.
-     */
+    @RequiresApi(Build.VERSION_CODES.R)
     fun performEnter() {
-        val focusedNode = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-        if (focusedNode != null) {
-            // A simple click often works for 'Enter' on buttons or submitting forms
-            focusedNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-        } else {
-            Log.e("InteractionService", "Could not find a focused node to 'Enter' on.")
+        val rootNode: AccessibilityNodeInfo? = rootInActiveWindow
+        if (rootNode == null) {
+            Log.e("InteractionService", "Cannot perform Enter: rootInActiveWindow is null.")
+            return
+        }
+
+        val focusedNode = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        if (focusedNode == null) {
+            Log.w("InteractionService", "Could not find a focused input node to perform 'Enter' on.")
+            return
+        }
+
+        try {
+            val supportedActions = focusedNode.actionList
+
+            // --- Step 1: Attempt the primary, correct method ---
+            val imeAction = AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER
+            if (supportedActions.contains(imeAction)) {
+                Log.d("InteractionService", "Attempting primary action: ACTION_IME_ENTER")
+                val success = focusedNode.performAction(imeAction.id)
+                if (success) {
+                    Log.d("InteractionService", "Successfully performed ACTION_IME_ENTER.")
+                    return // Action succeeded, we are done.
+                }
+                // If it failed, we'll proceed to the fallback.
+                Log.w("InteractionService", "ACTION_IME_ENTER was supported but failed to execute. Proceeding to fallback.")
+            }
+
+            // --- Step 2: Attempt the fallback method ---
+            Log.w("InteractionService", "ACTION_IME_ENTER not available or failed. Trying ACTION_CLICK as a fallback.")
+            val clickAction = AccessibilityNodeInfo.AccessibilityAction.ACTION_CLICK
+            if (supportedActions.contains(clickAction)) {
+                val success = focusedNode.performAction(clickAction.id)
+                if (success) {
+                    Log.d("InteractionService", "Fallback ACTION_CLICK succeeded.")
+                } else {
+                    Log.e("InteractionService", "Fallback ACTION_CLICK also failed.")
+                }
+            } else {
+                Log.e("InteractionService", "No supported 'Enter' or 'Click' action was found on the focused node.")
+            }
+
+        } catch (e: Exception) {
+            Log.e("InteractionService", "Exception while trying to perform Enter action", e)
+        } finally {
+            // IMPORTANT: Always recycle the node you found to prevent memory leaks.
+            focusedNode.recycle()
         }
     }
+
+    /**
+     * Traverses the node tree to find the primary scrollable container.
+     * A simple heuristic is to find the largest scrollable node on screen.
+     */
+    private fun findScrollableNodeAndGetInfo(rootNode: AccessibilityNodeInfo?): Pair<Int, Int> {
+        if (rootNode == null) return Pair(0, 0)
+
+        val queue: ArrayDeque<AccessibilityNodeInfo> = ArrayDeque()
+        queue.addLast(rootNode)
+
+        var bestNode: AccessibilityNodeInfo? = null
+        var maxNodeSize = -1
+
+        while (queue.isNotEmpty()) {
+            val node = queue.removeFirst()
+
+            if (node.isScrollable) {
+                val rect = android.graphics.Rect()
+                node.getBoundsInScreen(rect)
+                val size = rect.width() * rect.height()
+                if (size > maxNodeSize) {
+                    maxNodeSize = size
+                    bestNode = node
+                }
+            }
+
+            for (i in 0 until node.childCount) {
+                node.getChild(i)?.let { queue.addLast(it) }
+            }
+        }
+
+        var pixelsAbove = 0
+        var pixelsBelow = 0
+
+        bestNode?.let {
+            val rangeInfo = it.rangeInfo
+            if (rangeInfo != null) {
+                // Use RangeInfo if available (common in RecyclerViews)
+                pixelsAbove = (rangeInfo.current - rangeInfo.min).toInt()
+                pixelsBelow = (rangeInfo.max - rangeInfo.current).toInt()
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                // Fallback for Android R+ (common in ScrollViews)
+                // Note: getMaxScrollY() might not always be available.
+                pixelsAbove = 10
+                pixelsBelow = (5).coerceAtLeast(0)
+            }
+            // Recycle the node we found to be safe
+            it.recycle()
+        }
+
+        return Pair(pixelsAbove, pixelsBelow)
+    }
+
+    /**
+     * A new, powerful function to get all necessary screen data in one go.
+     */
+    @RequiresApi(Build.VERSION_CODES.O)
+    suspend fun getScreenAnalysisData(): RawScreenData {
+        val rootNode = rootInActiveWindow ?: return RawScreenData("<hierarchy/>", 0, 0)
+
+        // 1. Get scroll info by traversing the live nodes
+        val (pixelsAbove, pixelsBelow) = findScrollableNodeAndGetInfo(rootNode)
+
+        // 2. Get the XML dump (using your existing dumpWindowHierarchy function)
+        val xmlString = dumpWindowHierarchy(true)
+
+        return RawScreenData(xmlString, pixelsAbove, pixelsBelow)
+    }
+
+
     /**
      * Asynchronously captures a screenshot from an AccessibilityService in a safe and reliable way.
      * This function follows the "Strict Librarian" rule: it always closes the screenshot resource

@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -19,6 +20,10 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.blurr.voice.data.Memory
 import com.blurr.voice.data.MemoryManager
+import com.blurr.voice.v2.llm.GeminiApi
+import com.blurr.voice.v2.llm.GeminiMessage
+import com.blurr.voice.v2.llm.MessageRole
+import com.blurr.voice.v2.llm.TextPart
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch
@@ -41,7 +46,7 @@ class MemoriesActivity : AppCompatActivity() {
         setupRecyclerView()
         loadMemories()
     }
-    
+
     private fun setupViews() {
         // Setup toolbar
         val toolbar = findViewById<Toolbar>(R.id.toolbar)

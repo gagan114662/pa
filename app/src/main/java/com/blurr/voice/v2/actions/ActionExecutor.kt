@@ -5,6 +5,7 @@ import com.blurr.voice.agent.v1.InfoPool
 import com.blurr.voice.api.Finger
 import com.blurr.voice.utilities.SpeechCoordinator
 import com.blurr.voice.utilities.UserInputManager
+import com.blurr.voice.v2.fs.FileSystem
 import kotlinx.coroutines.runBlocking
 import kotlin.collections.get
 
@@ -54,13 +55,27 @@ class ActionExecutor(private val finger: Finger) {
             Action.Wait -> {
                 Thread.sleep(5_000)
             }
-            is Action.ScrollDown -> TODO()
-            is Action.ScrollUp -> TODO()
-            is Action.SearchGoogle -> TODO()
+            is Action.ScrollDown -> finger.scrollDown(action.amount)
+            is Action.ScrollUp -> finger.scrollUp(action.amount)
+            is Action.SearchGoogle -> {
+                finger.openApp("Chrome")
+            }
             is Action.Done -> TODO()
             is Action.ExtractStructuredData -> TODO()
             is Action.InputText -> TODO()
             is Action.ScrollToText -> TODO()
+            is Action.AppendFile -> {
+                val fs = FileSystem(context)
+                fs.appendFile(action.fileName,action.content)
+            }
+            is Action.ReadFile -> {
+                val fs = FileSystem(context)
+                //TODO
+            }
+            is Action.WriteFile -> {
+                val fs = FileSystem(context)
+                fs.writeFile(action.fileName,action.content)
+            }
         }
     }
 }

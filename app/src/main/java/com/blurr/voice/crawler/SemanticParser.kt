@@ -71,6 +71,24 @@ class SemanticParser(private  val applicationContext: Context) {
         return gson.toJson(preliminaryElements)
     }
 
+    fun parseToUIElement(xmlString: String, screenWidth: Int, screenHeight: Int):  MutableList<UIElement> {
+        // Step 1: Build the complete tree from the XML.
+        val rootNode = buildTreeFromXml(xmlString)
+
+        // Step 2: Perform the semantic merge (upward text propagation).
+        if (rootNode != null) {
+            mergeDescriptiveChildren(rootNode)
+        }
+
+        // Step 3: Flatten the tree to a preliminary list of important elements.
+        val preliminaryElements = mutableListOf<UIElement>()
+        if (rootNode != null) {
+            flattenAndFilter(rootNode, preliminaryElements, screenWidth, screenHeight)
+        }
+        return preliminaryElements
+
+    }
+
     /**
      * Converts UI elements to markdown format with numeric IDs for easy reference.
      *

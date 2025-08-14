@@ -30,6 +30,9 @@ sealed class Action {
     data class ScrollToText(val text: String) : Action()
     data class ExtractStructuredData(val query: String) : Action()
     data class InputText(val index: Int, val text: String) : Action()
+    data class WriteFile(val fileName: String, val content: String) : Action()
+    data class AppendFile(val fileName: String, val content: String) : Action()
+    data class ReadFile(val fileName: String) : Action()
     data class Done(val success: Boolean, val text: String, val filesToDisplay: List<String>? = null) : Action()
 
     // --- Companion Object: The Registry and Metadata Provider ---
@@ -102,9 +105,9 @@ sealed class Action {
                 params = listOf(ParamSpec("query", String::class, "A question or description of the data to extract (e.g., 'what is the price and rating of this product?')")),
                 build = { args -> ExtractStructuredData(args["query"] as String) }
             ),
-            "Input_Text" to Spec(
+            "Input_Text_and_ENTER" to Spec(
                 name = "Input_Text",
-                description = "Enters text into an input field (like a search bar or a form field).",
+                description = "Enters text into an input field (like a search bar or a form field). And then triggers the enter event which search if you are using search engine, send text when messaging app etc",
                 params = listOf(
                     ParamSpec("index", Int::class, "The numerical index of the input element"),
                     ParamSpec("text", String::class, "The text to be typed into the element")
@@ -123,6 +126,32 @@ sealed class Action {
                     val filesToDisplay = args["files_to_display"] as? List<String>
                     Done(args["success"] as Boolean, args["text"] as String, filesToDisplay)
                 }
+            ),
+            "WriteFile" to Spec(
+                name = "WriteFile",
+                description = "Write content to file_name in file system, use only .md or .txt extensions.",
+                params = listOf(
+                    ParamSpec("file_name", String::class, "The name of the file (e.g., 'report.md' or 'notes.txt')."),
+                    ParamSpec("content", String::class, "The content to write to the file.")
+                ),
+                build = { args -> WriteFile(args["file_name"] as String, args["content"] as String) }
+            ),
+            "AppendFile" to Spec(
+                name = "AppendFile",
+                description = "Append content to file_name in file system.",
+                params = listOf(
+                    ParamSpec("file_name", String::class, "The name of the file to append to."),
+                    ParamSpec("content", String::class, "The content to append.")
+                ),
+                build = { args -> AppendFile(args["file_name"] as String, args["content"] as String) }
+            ),
+            "ReadFile" to Spec(
+                name = "ReadFile",
+                description = "Read file_name from file system.",
+                params = listOf(
+                    ParamSpec("file_name", String::class, "The name of the file to read.")
+                ),
+                build = { args -> ReadFile(args["file_name"] as String) }
             )
 //            "Swipe" to Spec(
 //                name = "Swipe",

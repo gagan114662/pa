@@ -40,6 +40,8 @@ import android.view.View
 import com.blurr.voice.agent.v2.prompts.SystemPrompt
 import com.blurr.voice.services.AgentTaskService
 import com.blurr.voice.utilities.PermissionManager
+import com.blurr.voice.v2.actions.Action
+import com.blurr.voice.v2.actions.ActionExecutor
 
 class MainActivity : AppCompatActivity() {
 
@@ -154,6 +156,33 @@ class MainActivity : AppCompatActivity() {
             intent.data = url.toUri()
             startActivity(intent)
         }
+//
+//        lifecycleScope.launch {
+//            // Ensure permissions are ready before starting the test
+//            while (!isAccessibilityServiceEnabled()) {
+//                delay(1000) // wait until the service is enabled
+//            }
+//
+//            // Go to home screen to have a scrollable surface for testing
+////            finger.home()
+//            delay(10000) // wait for home screen to settle
+//            val finger = Finger(this@MainActivity)
+//            val actionExecutor = ActionExecutor(finger)
+//val info =InfoPool("dfsdfdv")
+//            while (true) {
+//                // Scroll down by 400 pixels
+//                actionExecutor.execute(Action.ScrollDown(1000),info, this@MainActivity )
+//                Log.d("ScrollTest", "Scrolled Down")
+//                // Wait for 1 second
+//                delay(1000)
+//
+//                // Scroll up by 400 pixels
+//                actionExecutor.execute(Action.ScrollUp(1000),info, this@MainActivity )
+//                Log.d("ScrollTest", "Scrolled Up")
+//                // Wait for 1 second
+//                delay(1000)
+//            }
+//        }
     }
 
     @SuppressLint("SetTextI18n")
