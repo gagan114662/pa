@@ -82,7 +82,7 @@ class Finger(private val context: Context) {
     /**
      * Swipes between two points on the screen.
      */
-    fun swipe(x1: Int, y1: Int, x2: Int, y2: Int, duration: Int = 500) {
+    fun swipe(x1: Int, y1: Int, x2: Int, y2: Int, duration: Int = 1000) {
         Log.d(TAG, "Swiping from ($x1, $y1) to ($x2, $y2)")
         service?.swipe(x1.toFloat(), y1.toFloat(), x2.toFloat(), y2.toFloat(), duration.toLong())
     }
