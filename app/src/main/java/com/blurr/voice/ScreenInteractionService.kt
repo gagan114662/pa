@@ -806,13 +806,11 @@ class ScreenInteractionService : AccessibilityService() {
         }
     }
 
-
-
     /**
      * A private recursive helper to find and collect interactable nodes.
      */
     private fun findInteractableNodesRecursive(
-        node: android.view.accessibility.AccessibilityNodeInfo?,
+        node: AccessibilityNodeInfo?,
         list: MutableList<InteractableElement>
     ) {
         if (node == null) return
@@ -844,9 +842,6 @@ class ScreenInteractionService : AccessibilityService() {
             findInteractableNodesRecursive(node.getChild(i), list)
         }
     }
-
-
-    // Rename the update method to be more descriptive
 
     /**
      * NEW: Creates and displays the AudioWaveView at the bottom of the screen.
@@ -881,11 +876,6 @@ class ScreenInteractionService : AccessibilityService() {
         }
     }
 
-
-    /**
-     * Connects the TTS speaking state to the wave view for smooth animations.
-     */
-
     /**
      * Connects the TTS audio output to the wave view for real-time visualization.
      */
@@ -919,7 +909,6 @@ class ScreenInteractionService : AccessibilityService() {
             }
         }
     }
-
 
 }
 
