@@ -2,7 +2,7 @@ package com.blurr.voice.utilities
 
 import android.graphics.Bitmap
 import android.util.Base64
-import com.blurr.voice.agent.InfoPool
+import com.blurr.voice.agent.v1.InfoPool
 import com.blurr.voice.api.GeminiApi
 import com.google.ai.client.generativeai.type.ImagePart
 import com.google.ai.client.generativeai.type.TextPart

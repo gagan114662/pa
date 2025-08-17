@@ -2,7 +2,9 @@ package com.blurr.voice.api
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import com.blurr.voice.ScreenInteractionService
 
 /**
@@ -80,7 +82,7 @@ class Finger(private val context: Context) {
     /**
      * Swipes between two points on the screen.
      */
-    fun swipe(x1: Int, y1: Int, x2: Int, y2: Int, duration: Int = 500) {
+    fun swipe(x1: Int, y1: Int, x2: Int, y2: Int, duration: Int = 1000) {
         Log.d(TAG, "Swiping from ($x1, $y1) to ($x2, $y2)")
         service?.swipe(x1.toFloat(), y1.toFloat(), x2.toFloat(), y2.toFloat(), duration.toLong())
     }
@@ -88,14 +90,17 @@ class Finger(private val context: Context) {
     /**
      * Types text into the focused input field. This is now much more efficient.
      */
+    @RequiresApi(Build.VERSION_CODES.R)
     fun type(text: String) {
         Log.d(TAG, "Typing text: $text")
         service?.typeTextInFocusedField(text)
+        this.enter()
     }
 
     /**
      * Simulates pressing the 'Enter' key.
      */
+    @RequiresApi(Build.VERSION_CODES.R)
     fun enter() {
         Log.d(TAG, "Performing 'Enter' action")
         service?.performEnter()
@@ -123,5 +128,50 @@ class Finger(private val context: Context) {
     fun switchApp() {
         Log.d(TAG, "Performing 'App Switch' action")
         service?.performRecents()
+    }
+    /**
+     * Scrolls the screen down by a given number of pixels.
+     * This performs a swipe from bottom to top.
+     *
+     * @param pixels The number of pixels to scroll.
+     * @param duration The duration of the swipe in milliseconds.
+     */
+    fun scrollDown(pixels: Int, duration: Int = 500) {
+        val displayMetrics = context.resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels
+        val screenHeight = displayMetrics.heightPixels
+
+        // Define swipe path in the middle of the screen
+        val x = screenWidth / 2
+        // Start swipe from 80% down the screen to avoid navigation bars
+        val y1 = (screenHeight * 0.8).toInt()
+        // Calculate end point, ensuring it doesn't go below 0
+        val y2 = (y1 - pixels).coerceAtLeast(0)
+
+        Log.d(TAG, "Scrolling down by $pixels pixels: swipe from ($x, $y1) to ($x, $y2)")
+        swipe(x, y1, x, y2, duration)
+    }
+
+    /**
+     * Scrolls the screen up by a given number of pixels.
+     * This performs a swipe from top to bottom.
+     *
+     * @param pixels The number of pixels to scroll.
+     * @param duration The duration of the swipe in milliseconds.
+     */
+    fun scrollUp(pixels: Int, duration: Int = 500) {
+        val displayMetrics = context.resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels
+        val screenHeight = displayMetrics.heightPixels
+
+        // Define swipe path in the middle of the screen
+        val x = screenWidth / 2
+        // Start swipe from 20% down the screen to avoid status bars
+        val y1 = (screenHeight * 0.2).toInt()
+        // Calculate end point, ensuring it doesn't go beyond screen height
+        val y2 = (y1 + pixels).coerceAtMost(screenHeight)
+
+        Log.d(TAG, "Scrolling up by $pixels pixels: swipe from ($x, $y1) to ($x, $y2)")
+        swipe(x, y1, x, y2, duration)
     }
 }

@@ -7,6 +7,7 @@ import android.os.Environment
 import java.io.File
 import android.util.Log
 import androidx.annotation.RequiresApi
+import com.blurr.voice.RawScreenData
 import com.blurr.voice.ScreenInteractionService
 
 class Eyes(context: Context) {
@@ -69,5 +70,30 @@ class Eyes(context: Context) {
             return false
         }
         return service.isTypingAvailable()
+    }
+
+    /**
+     * Gets all raw screen data (XML, scroll info) in a single, efficient call.
+     */
+    @RequiresApi(Build.VERSION_CODES.R)
+    suspend fun getRawScreenData(): RawScreenData? {
+        val service = ScreenInteractionService.instance
+        if (service == null) {
+            Log.e("AccessibilityController", "Accessibility Service is not running!")
+            return RawScreenData("", 0,0, 0, 0)
+        }
+        return service.getScreenAnalysisData()
+    }
+
+    /**
+     * Gets the package name of the current foreground activity.
+     */
+    fun getCurrentActivityName(): String {
+        val service = ScreenInteractionService.instance
+        if (service == null) {
+            Log.e("AccessibilityController", "Accessibility Service is not running!")
+            return "Unknown"
+        }
+        return service.getCurrentActivityName()
     }
 }

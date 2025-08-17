@@ -23,18 +23,18 @@ import android.provider.Settings
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import com.blurr.voice.agent.DeepSearch
-import com.blurr.voice.agent.VisionMode
-import com.blurr.voice.agent.ClarificationAgent
-import com.blurr.voice.agent.InfoPool
-import com.blurr.voice.agent.AgentConfig
+import com.blurr.voice.agent.v1.DeepSearch
+import com.blurr.voice.agent.v1.VisionMode
+import com.blurr.voice.agent.v1.ClarificationAgent
+import com.blurr.voice.agent.v1.InfoPool
+import com.blurr.voice.agent.v1.AgentConfig
 import com.blurr.voice.utilities.TTSManager
 import com.blurr.voice.utilities.STTManager
 import com.blurr.voice.utilities.UserIdManager
 import com.blurr.voice.utilities.UserProfileManager
 import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
-import com.blurr.voice.agent.VisionHelper
+import com.blurr.voice.agent.v1.VisionHelper
 import com.blurr.voice.utilities.getReasoningModelApiResponse
 import android.view.View
 import com.blurr.voice.services.AgentTaskService
@@ -53,7 +53,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var voiceInputButton: ImageButton
     private lateinit var voiceStatusText: TextView
     private lateinit var settingsButton: ImageButton
-    // REMOVED settings-related UI variables
 
     private lateinit var ttsManager: TTSManager
     private lateinit var sttManager: STTManager
@@ -67,7 +66,6 @@ class MainActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (isGranted) {
                 Toast.makeText(this, "Microphone permission granted!", Toast.LENGTH_SHORT).show()
-                // The onResume will handle updating the UI
             } else {
                 Toast.makeText(this, "Permission denied.", Toast.LENGTH_SHORT).show()
             }
@@ -97,13 +95,11 @@ class MainActivity : AppCompatActivity() {
         if (!profileManager.isProfileComplete()) {
             startActivity(Intent(this, OnboardingActivity::class.java))
         }
-
         val userIdManager = UserIdManager(applicationContext)
         userId = userIdManager.getOrCreateUserId()
         println(userId)
         askForNotificationPermission()
         checkAndRequestOverlayPermission()
-        // Initialize permission manager
         permissionManager = PermissionManager(this)
         permissionManager.initializePermissionLauncher()
         permissionManager.requestAllPermissions()
@@ -120,7 +116,6 @@ class MainActivity : AppCompatActivity() {
 
         conversationalAgentButton = findViewById(R.id.conversationalAgentButton)
         settingsButton = findViewById(R.id.settingsButton)
-        // REMOVED findViewById for settings views
 
         grantPermission.setOnClickListener {
             permissionManager.openAccessibilitySettings()
@@ -134,7 +129,6 @@ class MainActivity : AppCompatActivity() {
         setupClickListeners()
         setupVoiceInput()
         setupSettingsButton()
-        // REMOVED call to setupVisionModeListener()
 
         handler = Handler(Looper.getMainLooper())
 
@@ -225,7 +219,6 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    // REMOVED setupVisionModeListener()
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupVoiceInput() {
@@ -283,28 +276,6 @@ class MainActivity : AppCompatActivity() {
             }
         )
     }
-
-    // New function to start the service
-    private fun setUpConversationalAgent() {
-        conversationalAgentButton.setOnClickListener {
-            if (!ConversationalAgentService.isRunning) {
-//                handler.postDelayed({ updateUI() }, 500)
-                Log.d("ConvAgent", "Checking")
-                Log.d("MainActivity", "Permission granted, starting ConversationalAgentService.")
-                val serviceIntent = Intent(this, ConversationalAgentService::class.java)
-                ContextCompat.startForegroundService(this, serviceIntent)
-                Toast.makeText(this, "Conversation agent is active", Toast.LENGTH_SHORT).show()
-                handler.postDelayed({ updateUI() }, 100)
-            }else{
-                Log.d("MainActivity", "Stopping ConversationalAgentService.")
-                stopService(Intent(this, ConversationalAgentService::class.java))
-                Toast.makeText(this, "Conversation ended", Toast.LENGTH_SHORT).show()
-                handler.postDelayed({ updateUI() }, 100)
-            }
-        }
-
-    }
-
 
     private fun performTaskFromVoiceInput(instruction: String) {
         // ... (this logic remains unchanged)

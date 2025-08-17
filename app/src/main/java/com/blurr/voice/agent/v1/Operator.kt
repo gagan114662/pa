@@ -1,6 +1,7 @@
-package com.blurr.voice.agent
+package com.blurr.voice.agent.v1
 
 import android.content.Context
+import android.content.pm.PackageManager
 import com.blurr.voice.api.Finger
 import com.blurr.voice.crawler.SemanticParser
 import com.google.ai.client.generativeai.type.TextPart
@@ -8,6 +9,9 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import com.blurr.voice.utilities.SpeechCoordinator
 import com.blurr.voice.utilities.UserInputManager
+import kotlinx.coroutines.runBlocking
+import org.json.JSONObject
+import kotlin.collections.get
 
 import kotlin.math.min
 
@@ -268,7 +272,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
                 val message = args["message"]?.toString()?.trim()
                 if (message != null) {
                     // Use SpeechCoordinator to ensure no conflicts with STT
-                    kotlinx.coroutines.runBlocking {
+                    runBlocking {
                         val speechCoordinator = SpeechCoordinator.getInstance(context)
                         speechCoordinator.speakToUser(message)
                     }
@@ -280,7 +284,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
                 val question = args["question"]?.toString()?.trim()
                 if (question != null) {
                     // Use SpeechCoordinator to ask the question (ensures no STT conflicts)
-                    kotlinx.coroutines.runBlocking {
+                    runBlocking {
                         val speechCoordinator = SpeechCoordinator.getInstance(context)
                         speechCoordinator.speakToUser(question)
                     }
@@ -354,7 +358,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
                     .trim()
             }
 
-            val json = org.json.JSONObject(cleanedActionStr)
+            val json = JSONObject(cleanedActionStr)
             val name = json.getString("name")
             val arguments = json.optJSONObject("arguments")?.let {
                 it.keys().asSequence().associateWith { key -> it.get(key) }
@@ -397,7 +401,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
     private fun findPackageNameFromAppName(appName: String, context: Context): String? {
         return try {
             val packageManager = context.packageManager
-            val apps = packageManager.getInstalledApplications(android.content.pm.PackageManager.GET_META_DATA)
+            val apps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
             
             // Try exact match first
             apps.find { app ->

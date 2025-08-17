@@ -17,8 +17,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
-import android.util.Patterns
-import com.blurr.voice.agent.VisionMode
+import com.blurr.voice.agent.v1.VisionMode
 import com.blurr.voice.api.GoogleTts
 import com.blurr.voice.api.TTSVoice
 import com.blurr.voice.services.EnhancedWakeWordService

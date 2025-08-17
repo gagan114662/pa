@@ -16,12 +16,12 @@ import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
-import com.blurr.voice.agent.AgentConfig
-import com.blurr.voice.agent.ClarificationAgent
-import com.blurr.voice.agent.InfoPool
-import com.blurr.voice.agent.VisionHelper
-import com.blurr.voice.agent.VisionMode
-import com.blurr.voice.services.AgentTaskService
+import com.blurr.voice.agent.v1.AgentConfig
+import com.blurr.voice.agent.v1.ClarificationAgent
+import com.blurr.voice.agent.v1.InfoPool
+import com.blurr.voice.agent.v1.VisionHelper
+import com.blurr.voice.agent.v1.VisionMode
+//import com.blurr.voice.services.AgentTaskService
 import com.blurr.voice.utilities.SpeechCoordinator
 import android.os.Handler
 import android.os.Looper
@@ -34,6 +34,8 @@ import com.blurr.voice.utilities.addResponse
 import com.blurr.voice.utilities.getReasoningModelApiResponse
 import com.blurr.voice.data.MemoryManager
 import com.blurr.voice.data.MemoryExtractor
+import com.blurr.voice.utilities.UserProfileManager
+import com.blurr.voice.v2.AgentService
 import com.google.ai.client.generativeai.type.TextPart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -70,6 +72,7 @@ class ConversationalAgentService : Service() {
     private val memoryManager by lazy { MemoryManager.getInstance(this) }
     private val usedMemories = mutableSetOf<String>() // Track memories already used in this conversation
 
+
     companion object {
         const val NOTIFICATION_ID = 3
         const val CHANNEL_ID = "ConversationalAgentChannel"
@@ -102,82 +105,18 @@ class ConversationalAgentService : Service() {
         }
         return START_STICKY
     }
-    
+
     /**
      * Gets a personalized greeting using the user's name from memories if available
      */
-    private suspend fun getPersonalizedGreeting(): String {
+    private fun getPersonalizedGreeting(): String {
         try {
-            // Search for name-related memories
-            // val nameMemories = memoryManager.searchMemories("name", topK = 10)
-            //TODO: Uncomment this when we have a way to get the user's name from the memories
-            
-            // if (nameMemories.isNotEmpty()) {
-            //     // Look for memories that contain name information
-            //     val nameMemory = nameMemories.find { memory ->
-            //         memory.lowercase().contains("name") && 
-            //         (memory.lowercase().contains("is") || memory.lowercase().contains("called"))
-            //     }
-                
-            //     if (nameMemory != null) {
-            //         // Extract the name from the memory
-            //         val name = extractNameFromMemory(nameMemory)
-            //         if (name.isNotEmpty()) {
-            //             Log.d("ConvAgent", "Found user name: $name")
-            //             return "Hello $name! How can I help you today?"
-            //         }
-            //     }
-            // }
-            
-            // Fallback to generic greeting
+            val userProfile = UserProfileManager(this@ConversationalAgentService)
             Log.d("ConvAgent", "No name found in memories, using generic greeting")
-            return "How can I help?"
-            
+            return "How can I help ${userProfile.getName()}?"
         } catch (e: Exception) {
             Log.e("ConvAgent", "Error getting personalized greeting", e)
             return "How can I help?"
-        }
-    }
-    
-    /**
-     * Extracts the user's name from a memory string
-     */
-    private fun extractNameFromMemory(memory: String): String {
-        return try {
-            // Common patterns for name memories
-            val patterns = listOf(
-                Regex("""(?:my|user'?s?)\s+name\s+is\s+(\w+)""", RegexOption.IGNORE_CASE),
-                Regex("""(?:i'?m|i am)\s+(?:called\s+)?(\w+)""", RegexOption.IGNORE_CASE),
-                Regex("""(?:name|called)\s+(?:is\s+)?(\w+)""", RegexOption.IGNORE_CASE),
-                Regex("""(\w+)\s+is\s+(?:my|user'?s?)\s+name""", RegexOption.IGNORE_CASE)
-            )
-            
-            for (pattern in patterns) {
-                val match = pattern.find(memory)
-                if (match != null) {
-                    val name = match.groupValues[1]
-                    if (name.length > 1 && name.all { it.isLetter() }) {
-                        return name.capitalize()
-                    }
-                }
-            }
-            
-            // If no pattern matches, try to extract any capitalized word that might be a name
-            val words = memory.split(" ")
-            for (word in words) {
-                if (word.length > 2 && word[0].isUpperCase() && word.all { it.isLetter() }) {
-                    // Check if it's not a common word
-                    val commonWords = setOf("the", "and", "but", "for", "with", "this", "that", "they", "have", "from")
-                    if (!commonWords.contains(word.lowercase())) {
-                        return word
-                    }
-                }
-            }
-            
-            ""
-        } catch (e: Exception) {
-            Log.e("ConvAgent", "Error extracting name from memory", e)
-            ""
         }
     }
 
@@ -203,7 +142,7 @@ class ConversationalAgentService : Service() {
             onError = { error ->
                 Log.e("ConvAgent", "STT Error: $error")
                 sttErrorAttempts++
-                
+
                 serviceScope.launch {
                     if (sttErrorAttempts >= maxSttErrorAttempts) {
                         Log.d("ConvAgent", "Max STT error attempts reached ($maxSttErrorAttempts). Ending conversation gracefully.")
@@ -244,7 +183,7 @@ class ConversationalAgentService : Service() {
                         Log.d("ConvAgent", "Model identified a task. Checking for clarification...")
                         // --- NEW: Check if the task instruction needs clarification ---
                         removeClarificationQuestions()
-                        
+
                         if (clarificationAttempts < maxClarificationAttempts) {
                             val (needsClarification, questions) = checkIfClarificationNeeded(decision.instruction)
                             Log.d("ConcAgent", needsClarification.toString())
@@ -259,19 +198,22 @@ class ConversationalAgentService : Service() {
                                 speakAndThenListen(questionToAsk, false)
                             } else {
                                 Log.d("ConvAgent", "Task is clear. Executing: ${decision.instruction}")
-                                val taskIntent = Intent(this@ConversationalAgentService, AgentTaskService::class.java).apply {
-                                    putExtra("TASK_INSTRUCTION", decision.instruction)
-                                    putExtra("VISION_MODE", "XML")
-                                }
-                                startService(taskIntent)
+//                                val taskIntent = Intent(this@ConversationalAgentService, AgentTaskService::class.java).apply {
+//                                    putExtra("TASK_INSTRUCTION", decision.instruction)
+//                                    putExtra("VISION_MODE", "XML")
+//                                }
+                                AgentService.start(applicationContext, decision.instruction)
+//                                startService(taskIntent)
                                 gracefulShutdown(decision.reply)                            }
                         } else {
                             Log.d("ConvAgent", "Max clarification attempts reached ($maxClarificationAttempts). Proceeding with task execution.")
-                            val taskIntent = Intent(this@ConversationalAgentService, AgentTaskService::class.java).apply {
-                                putExtra("TASK_INSTRUCTION", decision.instruction)
-                                putExtra("VISION_MODE", "XML")
-                            }
-                            startService(taskIntent)
+//                            val taskIntent = Intent(this@ConversationalAgentService, AgentTaskService::class.java).apply {
+//                                putExtra("TASK_INSTRUCTION", decision.instruction)
+//                                putExtra("VISION_MODE", "XML")
+//                            }
+//                            startService(taskIntent)
+                            AgentService.start(applicationContext, decision.instruction)
+
                             gracefulShutdown(decision.reply)
                         }
 
@@ -301,7 +243,7 @@ class ConversationalAgentService : Service() {
             val tempInfoPool = InfoPool(instruction = instruction)
             // Use 'this' as the context for the service
             val config = AgentConfig(visionMode = VisionMode.XML, apiKey = "", context = this)
-            
+
             Log.d("ConvAgent", "Checking clarification with conversation history (${conversationHistory.size} messages)")
             val prompt = clarificationAgent.getPromptWithHistory(tempInfoPool, config, conversationHistory)
             val chat = clarificationAgent.initChat()
@@ -369,7 +311,7 @@ class ConversationalAgentService : Service() {
 
         conversationHistory = addResponse("user", systemPrompt, emptyList())
     }
-    
+
     /**
      * Updates the system prompt with relevant memories from the database
      */
@@ -379,39 +321,39 @@ class ConversationalAgentService : Service() {
             val lastUserMessage = conversationHistory.lastOrNull { it.first == "user" }
                 ?.second?.filterIsInstance<TextPart>()
                 ?.joinToString(" ") { it.text } ?: ""
-            
+
             if (lastUserMessage.isNotEmpty()) {
                 Log.d("ConvAgent", "Searching for memories relevant to: ${lastUserMessage.take(100)}...")
-                
+
                 var relevantMemories = memoryManager.searchMemories(lastUserMessage, topK = 5).toMutableList() // Get more memories to filter from
                 val nameMemories = memoryManager.searchMemories("name", topK = 2)
                 relevantMemories.addAll(nameMemories)
                 if (relevantMemories.isNotEmpty()) {
                     Log.d("ConvAgent", "Found ${relevantMemories.size} relevant memories")
-                    
+
                     // Filter out memories that have already been used in this conversation
                     val newMemories = relevantMemories.filter { memory ->
                         !usedMemories.contains(memory)
                     }.take(20) // Limit to top 20 new memories
-                    
+
                     if (newMemories.isNotEmpty()) {
                         Log.d("ConvAgent", "Adding ${newMemories.size} new memories to context")
-                        
+
                         // Add new memories to the used set
                         newMemories.forEach { usedMemories.add(it) }
-                        
+
                         // Get current memory context from system prompt
                         val currentPrompt = conversationHistory.first().second
                             .filterIsInstance<TextPart>()
                             .firstOrNull()?.text ?: ""
-                        
+
                         val currentMemoryContext = extractCurrentMemoryContext(currentPrompt)
                         val allMemories = (currentMemoryContext + newMemories).distinct()
-                        
+
                         // Update the system prompt with all memories
                         val memoryContext = allMemories.joinToString("\n") { "- $it" }
                         val updatedPrompt = currentPrompt.replace("{memory_context}", memoryContext)
-                        
+
                         if (updatedPrompt.isNotEmpty()) {
                             // Replace the first system message with updated prompt
                             conversationHistory = conversationHistory.toMutableList().apply {
@@ -430,7 +372,6 @@ class ConversationalAgentService : Service() {
             Log.e("ConvAgent", "Error updating system prompt with memories", e)
         }
     }
-
 
     /**
      * Extracts current memory context from the system prompt
@@ -454,34 +395,7 @@ class ConversationalAgentService : Service() {
             emptyList()
         }
     }
-    
-    /**
-     * Gets the user's name from the current memory context if available
-     */
-    private fun getUserNameFromCurrentContext(): String {
-        return try {
-            val currentPrompt = conversationHistory.first().second
-                .filterIsInstance<TextPart>()
-                .firstOrNull()?.text ?: ""
-            
-            val currentMemories = extractCurrentMemoryContext(currentPrompt)
-            
-            // Look for name-related memories in the current context
-            val nameMemory = currentMemories.find { memory ->
-                memory.lowercase().contains("name") && 
-                (memory.lowercase().contains("is") || memory.lowercase().contains("called"))
-            }
-            
-            if (nameMemory != null) {
-                extractNameFromMemory(nameMemory)
-            } else {
-                ""
-            }
-        } catch (e: Exception) {
-            Log.e("ConvAgent", "Error getting user name from current context", e)
-            ""
-        }
-    }
+
     private fun parseModelResponse(response: String): ModelDecision {
         try {
             val type = response.substringAfter("### Type ###", "").substringBefore("###").trim()
@@ -522,8 +436,6 @@ class ConversationalAgentService : Service() {
             manager?.createNotificationChannel(serviceChannel)
         }
     }
-
-
 
     /**
      * Displays a list of futuristic-styled clarification questions at the top of the screen.
@@ -641,6 +553,7 @@ class ConversationalAgentService : Service() {
             clarificationQuestionViews.clear()
         }
     }
+
     private suspend fun gracefulShutdown(exitMessage: String? = null) {
             if (exitMessage != null) {
                 speechCoordinator.speakText(exitMessage)
@@ -656,6 +569,7 @@ class ConversationalAgentService : Service() {
             stopSelf()
 
     }
+
     override fun onDestroy() {
         super.onDestroy()
         Log.d("ConvAgent", "Service onDestroy")

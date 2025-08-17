@@ -3,6 +3,7 @@ package com.blurr.voice
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.animation.ValueAnimator
+import android.content.ComponentName
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Path
@@ -39,12 +40,9 @@ import java.io.FileOutputStream
 import java.io.OutputStream
 import java.io.StringReader
 import java.io.StringWriter
-import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-
-// Data class to hold structured information about a parsed UI element
 private data class SimplifiedElement(
     val description: String,
     val bounds: Rect,
@@ -53,22 +51,23 @@ private data class SimplifiedElement(
     val className: String
 )
 
+data class RawScreenData(
+    val xml: String,
+    val pixelsAbove: Int,
+    val pixelsBelow: Int,
+    val screenWidth: Int,
+    val screenHeight: Int
+)
+
 class ScreenInteractionService : AccessibilityService() {
 
     companion object {
         var instance: ScreenInteractionService? = null
-        const val ACTION_SCREENSHOT_TAKEN = "com.example.accessiblity_service_test.SCREENSHOT_TAKEN"
-        // A flag to easily toggle the debug taps on or off
+
         const val DEBUG_SHOW_TAPS = false
-        // A flag to easily toggle the debug bounding boxes on or off
+
         const val DEBUG_SHOW_BOUNDING_BOXES = false
     }
-
-    // Add these properties to your service/activity class
-    private var rotationSpeedAnimator: ValueAnimator? = null
-    private var currentRotationSpeedFactor: Float = 0f // Will be animated between 0.0f and 1.0f
-    private val MAX_ROTATION_SPEED = 2.5f // Adjust this value to make the max rotation faster or slower
-    private val ANIMATION_DURATION_MS = 1500L // 1.5 seconds for acceleration/deceleration
 
     private var windowManager: WindowManager? = null
 
@@ -77,26 +76,9 @@ class ScreenInteractionService : AccessibilityService() {
     private var audioWaveView: AudioWaveView? = null
     private var glowingBorderView: GlowBorderView? = null
 
-
-
-    // RENAME rotationSpeedAnimator to masterAnimator for clarity
-    private var masterAnimator: ValueAnimator? = null
-    // NEW: Animator to handle speed transitions
-    private var speedAnimator: ValueAnimator? = null
-
-    // We will animate this value between the speeds defined below
-    private var currentRotationSpeed = 0f
-    private var currentRotationAngle = 0f
-
-    // --- DEFINE YOUR SPEEDS HERE ---
-    private  val BASE_SPEED = 60.0f  // Slow speed when idle
-    private  val FAST_SPEED = 10.0f  // Fast speed when speaking
-    private  val SPEED_TRANSITION_DURATION_MS = 1500L // How long it takes to speed up/down
-
-
-    private val executor = Executors.newSingleThreadExecutor()
     private var statusBarHeight = -1
 
+    private var currentActivityName: String? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -115,131 +97,6 @@ class ScreenInteractionService : AccessibilityService() {
         // The rootInActiveWindow property holds the node info for the current screen,
         // which includes the package name.
         return rootInActiveWindow?.packageName?.toString()
-    }
-
-
-// In ScreenInteractionService.kt
-
-// REPLACE your existing 'setupGlowEffect' with this new version
-    /**
-     * Shows the border, starts the animation engine at base speed,
-     * and sets up a listener to change speed when TTS is active.
-     */
-    private fun setupGlowEffect() {
-        // 1. Show the border on screen
-        showGlowingBorder()
-
-        // 2. Start the animation engine
-        initializeRotationEngine()
-
-        // 3. Set the initial speed to the slow, base speed
-        setSpeed(BASE_SPEED)
-
-        // 4. Get the TTS manager instance
-        val ttsManager = TTSManager.getInstance(this)
-
-        val mainHandler = Handler(Looper.getMainLooper())
-
-// ...
-
-        ttsManager.utteranceListener = { isSpeaking ->
-            // Post the logic to the main thread
-            mainHandler.post {
-                if (isSpeaking) {
-                    Log.d("GlowEffect", "TTS Speaking: Setting FAST_SPEED")
-                    setSpeed(FAST_SPEED)
-                } else {
-                    Log.d("GlowEffect", "TTS Stopped: Setting BASE_SPEED")
-                    setSpeed(BASE_SPEED)
-                }
-            }
-        }
-    }
-
-    /**
-     * Smoothly animates the rotation speed to a new target value.
-     * @param targetSpeed The speed to transition to (e.g., BASE_SPEED or FAST_SPEED).
-     */
-    private fun setSpeed(targetSpeed: Float) {
-        speedAnimator?.cancel() // Cancel any ongoing speed change
-        speedAnimator = ValueAnimator.ofFloat(currentRotationSpeed, targetSpeed).apply {
-            duration = SPEED_TRANSITION_DURATION_MS
-            interpolator = android.view.animation.AccelerateDecelerateInterpolator()
-            addUpdateListener { animator ->
-                // This updates the speed value on every frame of the transition
-                currentRotationSpeed = animator.animatedValue as Float
-            }
-            start()
-        }
-    }
-    /**
-     * NEW: Creates and displays the glowing border overlay.
-     */
-    private fun showGlowingBorder() {
-        if (!Settings.canDrawOverlays(this)) {
-            Log.w("InteractionService", "Cannot show glowing border: 'Draw over other apps' permission not granted.")
-            return
-        }
-        if (glowingBorderView != null) return // Avoid adding multiple views
-
-        glowingBorderView = GlowBorderView(this)
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, // Use accessibility overlay
-            // Flags to make the overlay non-interactive (lets touches pass through)
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT
-        )
-        // UI operations must be on the main thread
-        Handler(Looper.getMainLooper()).post {
-            windowManager?.addView(glowingBorderView, params)
-            Log.d("InteractionService", "Glowing border added.")
-        }
-    }
-
-    /**
-     * NEW: Animates the glow based on voice amplitude.
-     * @param amplitude Normalized voice volume (0.0f to 1.0f).
-     */
-    /**
-     * Animates the glow based on voice amplitude and animated rotation speed.
-     * @param amplitude Normalized voice volume (0.0f to 1.0f).
-     */
-    private fun updateGlowAnimation(amplitude: Float) {
-        glowingBorderView?.let { view ->
-            // 1. Alpha pulsing based on volume (this logic remains the same)
-            val targetAlpha = (80 + 175 * amplitude).toInt()
-            view.setGlowAlpha(targetAlpha)
-
-            // 2. Rotation based on the smoothly animated speed factor
-            // The rotation amount is now driven by our ValueAnimator, not the amplitude
-            val rotationAmount = currentRotationSpeedFactor * MAX_ROTATION_SPEED
-            currentRotationAngle = (currentRotationAngle + rotationAmount) % 360
-            view.setRotation(currentRotationAngle)
-        }
-    }
-
-    /**
-     * Starts the master animation loop. This loop runs forever and uses the
-     * 'currentRotationSpeed' variable to update the border's angle.
-     */
-    private fun initializeRotationEngine() {
-        masterAnimator?.cancel()
-        masterAnimator = ValueAnimator.ofFloat(0f, 360f).apply {
-            duration = 10000L // Duration doesn't matter much, it's just a continuous ticker
-            interpolator = android.view.animation.LinearInterpolator()
-            repeatCount = ValueAnimator.INFINITE
-
-            addUpdateListener {
-                // This is the core engine, running on every frame
-                currentRotationAngle = (currentRotationAngle + currentRotationSpeed) % 360
-                glowingBorderView?.setRotation(currentRotationAngle)
-            }
-            start()
-        }
     }
 
     /**
@@ -450,7 +307,6 @@ class ScreenInteractionService : AccessibilityService() {
         return allElements
     }
 
-
     /**
      * Formats the structured list of elements into a single string for the LLM.
      */
@@ -485,7 +341,7 @@ class ScreenInteractionService : AccessibilityService() {
                 serializer.endDocument()
 
                 val rawXml = stringWriter.toString()
-                logLongString("rawXml", rawXml)
+//                logLongString("rawXml", rawXml)
 
                 // Get screen dimensions
                 val screenWidth: Int
@@ -503,11 +359,9 @@ class ScreenInteractionService : AccessibilityService() {
                     screenHeight = size.y
                 }
 
-                // Log.d("APPMAPXML", rawXml)
 
-                // val semanticParser = SemanticParser(this@ScreenInteractionService)
-                // val simplifiedJson = semanticParser.parse(rawXml, screenWidth, screenHeight)
-                // Log.d("APPMAP", "Screen Width: $screenWidth, Screen Height: $screenHeight\n$simplifiedJson")
+//                 val semanticParser = SemanticParser()
+//                 val simplifiedJson = semanticParser.toHierarchicalString(rawXml)
 //                // 1. Parse the raw XML into a structured list.
                 val simplifiedElements = parseXmlToSimplifiedElements(rawXml)
                 println("SIZEEEE : " + simplifiedElements.size)
@@ -515,6 +369,17 @@ class ScreenInteractionService : AccessibilityService() {
                 if (DEBUG_SHOW_BOUNDING_BOXES) {
                     drawDebugBoundingBoxes(simplifiedElements)
                 }
+
+                // Inform user with a bottom toast (no screenshots taken)
+                try {
+                    Handler(Looper.getMainLooper()).post {
+                        android.widget.Toast.makeText(
+                            this@ScreenInteractionService,
+                            "We just read your screen structure (no screenshots) of single frame so we can automate your task.",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                } catch (_: Exception) { }
 
                 if (pureXML) {
                     return@withContext rawXml
@@ -575,9 +440,22 @@ class ScreenInteractionService : AccessibilityService() {
         }
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // We are triggering actions proactively, so we don't need to react to events.
+    override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            val packageName = event.packageName?.toString()
+            val className = event.className?.toString()
+
+            if (!packageName.isNullOrBlank() && !className.isNullOrBlank()) {
+                this.currentActivityName = ComponentName(packageName, className).flattenToString()
+                Log.d("AccessibilityService", "Current Activity Updated: $currentActivityName")
+            }
+        }
     }
+
+    fun getCurrentActivityName(): String {
+        return this.currentActivityName ?: "Unknown"
+    }
+
 
     override fun onInterrupt() {
         Log.e("InteractionService", "Accessibility Service interrupted.")
@@ -597,7 +475,6 @@ class ScreenInteractionService : AccessibilityService() {
      */
     fun isTypingAvailable(): Boolean {
         val focusedNode = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-        // A field is available for typing if it's focused, editable, and enabled.
         return focusedNode != null && focusedNode.isEditable && focusedNode.isEnabled
     }
 
@@ -630,6 +507,40 @@ class ScreenInteractionService : AccessibilityService() {
             .build()
 
         dispatchGesture(gesture, null, null)
+    }
+
+    /**
+     * Scrolls the screen down by a given number of pixels with more precision.
+     * This performs a swipe from bottom to top with a calculated duration
+     * to maintain a slow, constant velocity and minimize the "fling" effect.
+     *
+     * @param pixels The number of pixels to scroll.
+     * @param pixelsPerSecond The desired velocity of the swipe. Lower is more precise.
+     */
+    fun scrollDownPrecisely(pixels: Int, pixelsPerSecond: Int = 1000) {
+        val displayMetrics = resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels
+        val screenHeight = displayMetrics.heightPixels
+
+        // Define swipe path in the middle of the screen
+        val x = screenWidth / 2
+        // Start swipe from 80% down the screen to avoid navigation bars
+        val y1 = (screenHeight * 0.8).toInt()
+        // Calculate end point, ensuring it doesn't go below 0
+        val y2 = (y1 - pixels).coerceAtLeast(0)
+
+        // Calculate duration based on distance to maintain a constant, slow velocity
+        // duration (ms) = (distance (px) / velocity (px/s)) * 1000 (ms/s)
+        val distance = y1 - y2
+        if (distance <= 0) {
+            Log.w("Scroll", "Scroll distance is zero or negative. Aborting.")
+            return
+        }
+
+        val duration = (distance.toFloat() / pixelsPerSecond * 1000).toInt()
+
+        Log.d("Scroll", "Scrolling down by $pixels pixels: swipe from ($x, $y1) to ($x, $y2) over $duration ms")
+        swipe(x.toFloat(), y1.toFloat(), x.toFloat(), y2.toFloat(), duration.toLong())
     }
 
     /**
@@ -673,18 +584,140 @@ class ScreenInteractionService : AccessibilityService() {
         performGlobalAction(GLOBAL_ACTION_RECENTS)
     }
 
-    /**
-     * Simulates an 'Enter' key press on the focused element.
-     */
+    @RequiresApi(Build.VERSION_CODES.R)
     fun performEnter() {
-        val focusedNode = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-        if (focusedNode != null) {
-            // A simple click often works for 'Enter' on buttons or submitting forms
-            focusedNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-        } else {
-            Log.e("InteractionService", "Could not find a focused node to 'Enter' on.")
+        val rootNode: AccessibilityNodeInfo? = rootInActiveWindow
+        if (rootNode == null) {
+            Log.e("InteractionService", "Cannot perform Enter: rootInActiveWindow is null.")
+            return
+        }
+
+        val focusedNode = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        if (focusedNode == null) {
+            Log.w("InteractionService", "Could not find a focused input node to perform 'Enter' on.")
+            return
+        }
+
+        try {
+            val supportedActions = focusedNode.actionList
+
+            // --- Step 1: Attempt the primary, correct method ---
+            val imeAction = AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER
+            if (supportedActions.contains(imeAction)) {
+                Log.d("InteractionService", "Attempting primary action: ACTION_IME_ENTER")
+                val success = focusedNode.performAction(imeAction.id)
+                if (success) {
+                    Log.d("InteractionService", "Successfully performed ACTION_IME_ENTER.")
+                    return // Action succeeded, we are done.
+                }
+                // If it failed, we'll proceed to the fallback.
+                Log.w("InteractionService", "ACTION_IME_ENTER was supported but failed to execute. Proceeding to fallback.")
+            }
+
+            // --- Step 2: Attempt the fallback method ---
+            Log.w("InteractionService", "ACTION_IME_ENTER not available or failed. Trying ACTION_CLICK as a fallback.")
+            val clickAction = AccessibilityNodeInfo.AccessibilityAction.ACTION_CLICK
+            if (supportedActions.contains(clickAction)) {
+                val success = focusedNode.performAction(clickAction.id)
+                if (success) {
+                    Log.d("InteractionService", "Fallback ACTION_CLICK succeeded.")
+                } else {
+                    Log.e("InteractionService", "Fallback ACTION_CLICK also failed.")
+                }
+            } else {
+                Log.e("InteractionService", "No supported 'Enter' or 'Click' action was found on the focused node.")
+            }
+
+        } catch (e: Exception) {
+            Log.e("InteractionService", "Exception while trying to perform Enter action", e)
+        } finally {
+            // IMPORTANT: Always recycle the node you found to prevent memory leaks.
+            focusedNode.recycle()
         }
     }
+
+    /**
+     * Traverses the node tree to find the primary scrollable container.
+     * A simple heuristic is to find the largest scrollable node on screen.
+     */
+    private fun findScrollableNodeAndGetInfo(rootNode: AccessibilityNodeInfo?): Pair<Int, Int> {
+        if (rootNode == null) return Pair(0, 0)
+
+        val queue: ArrayDeque<AccessibilityNodeInfo> = ArrayDeque()
+        queue.addLast(rootNode)
+
+        var bestNode: AccessibilityNodeInfo? = null
+        var maxNodeSize = -1
+
+        while (queue.isNotEmpty()) {
+            val node = queue.removeFirst()
+
+            if (node.isScrollable) {
+                val rect = android.graphics.Rect()
+                node.getBoundsInScreen(rect)
+                val size = rect.width() * rect.height()
+                if (size > maxNodeSize) {
+                    maxNodeSize = size
+                    bestNode = node
+                }
+            }
+
+            for (i in 0 until node.childCount) {
+                node.getChild(i)?.let { queue.addLast(it) }
+            }
+        }
+
+        var pixelsAbove = 0
+        var pixelsBelow = 0
+
+        bestNode?.let {
+            val rangeInfo = it.rangeInfo
+            if (rangeInfo != null) {
+                // Use RangeInfo if available (common in RecyclerViews)
+                pixelsAbove = (rangeInfo.current - rangeInfo.min).toInt()
+                pixelsBelow = (rangeInfo.max - rangeInfo.current).toInt()
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                // Fallback for Android R+ (common in ScrollViews)
+                // Note: getMaxScrollY() might not always be available.
+                pixelsAbove = 10
+                pixelsBelow = (5).coerceAtLeast(0)
+            }
+            // Recycle the node we found to be safe
+            it.recycle()
+        }
+
+        return Pair(pixelsAbove, pixelsBelow)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.R) // R is required for getCurrentWindowMetrics
+    private fun getScreenDimensions(): Pair<Int, Int> {
+        val windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        val metrics = windowManager.currentWindowMetrics
+        val width = metrics.bounds.width()
+        val height = metrics.bounds.height()
+//        Log.d("ScreenInteractionService", "Fetched screen dimensions: ${width}x${height}")
+        return Pair(width, height)
+    }
+
+    /**
+     * A new, powerful function to get all necessary screen data in one go.
+     */
+    @RequiresApi(Build.VERSION_CODES.R)
+    suspend fun getScreenAnalysisData(): RawScreenData {
+
+        val (screenWidth, screenHeight) = getScreenDimensions()
+        val rootNode = rootInActiveWindow ?: return RawScreenData("<hierarchy/>", 0, 0, screenWidth,screenHeight)
+
+        // 1. Get scroll info by traversing the live nodes
+        val (pixelsAbove, pixelsBelow) = findScrollableNodeAndGetInfo(rootNode)
+
+        // 2. Get the XML dump (using your existing dumpWindowHierarchy function)
+        val xmlString = dumpWindowHierarchy(true)
+
+        return RawScreenData(xmlString, pixelsAbove, pixelsBelow, screenWidth, screenHeight)
+    }
+
+
     /**
      * Asynchronously captures a screenshot from an AccessibilityService in a safe and reliable way.
      * This function follows the "Strict Librarian" rule: it always closes the screenshot resource
@@ -773,13 +806,11 @@ class ScreenInteractionService : AccessibilityService() {
         }
     }
 
-
-
     /**
      * A private recursive helper to find and collect interactable nodes.
      */
     private fun findInteractableNodesRecursive(
-        node: android.view.accessibility.AccessibilityNodeInfo?,
+        node: AccessibilityNodeInfo?,
         list: MutableList<InteractableElement>
     ) {
         if (node == null) return
@@ -811,9 +842,6 @@ class ScreenInteractionService : AccessibilityService() {
             findInteractableNodesRecursive(node.getChild(i), list)
         }
     }
-
-
-    // Rename the update method to be more descriptive
 
     /**
      * NEW: Creates and displays the AudioWaveView at the bottom of the screen.
@@ -849,23 +877,6 @@ class ScreenInteractionService : AccessibilityService() {
     }
 
     /**
-     * NEW: Hides the wave view.
-     */
-    private fun hideAudioWave() {
-        Handler(Looper.getMainLooper()).post {
-            audioWaveView?.let { windowManager?.removeView(it) }
-            audioWaveView = null
-        }
-    }
-
-
-// --- REPLACE your old setupAudioWaveEffect with this new, simpler version ---
-    /**
-     * Connects the TTS speaking state to the wave view for smooth animations.
-     */
-
-    // --- REPLACED with the new reactive implementation ---
-    /**
      * Connects the TTS audio output to the wave view for real-time visualization.
      */
     private fun setupAudioWaveEffect() {
@@ -898,7 +909,6 @@ class ScreenInteractionService : AccessibilityService() {
             }
         }
     }
-
 
 }
 

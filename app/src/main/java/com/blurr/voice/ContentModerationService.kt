@@ -14,8 +14,7 @@ import android.os.Looper
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
-import com.blurr.voice.R // Make sure to import your R class
-import com.blurr.voice.agent.Judge
+import com.blurr.voice.agent.v1.Judge
 import com.blurr.voice.api.Eyes
 import com.blurr.voice.api.Finger
 import com.blurr.voice.utilities.Persistent

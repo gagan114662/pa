@@ -1,6 +1,7 @@
-package com.blurr.voice.agent
+package com.blurr.voice.agent.v1
 
 import android.graphics.Bitmap
+import android.util.Log
 import com.blurr.voice.utilities.addResponse
 import com.blurr.voice.utilities.addResponsePrePost
 
@@ -64,7 +65,7 @@ object VisionHelper {
      * Logs vision mode information for debugging.
      */
     fun logVisionModeInfo(config: AgentConfig) {
-        android.util.Log.d("VisionHelper", "Vision Mode: ${config.visionMode.displayName}")
-        android.util.Log.d("VisionHelper", "Description: ${config.visionMode.description}")
+        Log.d("VisionHelper", "Vision Mode: ${config.visionMode.displayName}")
+        Log.d("VisionHelper", "Description: ${config.visionMode.description}")
     }
 } 
