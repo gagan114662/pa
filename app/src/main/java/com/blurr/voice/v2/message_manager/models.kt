@@ -1,14 +1,16 @@
 package com.blurr.voice.v2.message_manager
 
 import com.blurr.voice.v2.llm.GeminiMessage
+import kotlinx.serialization.Serializable
 
 
 /**
  * Represents a single item in the agent's high-level history summary.
  * This is used to build the <agent_history> section of the prompt.
  */
+@Serializable
 data class HistoryItem(
-    val stepNumber: Int?,
+    val stepNumber: Int? = null,
     val evaluation: String? = null,
     val memory: String? = null,
     val nextGoal: String? = null,
@@ -40,10 +42,11 @@ data class HistoryItem(
  * Holds the current, structured message history to be sent to the LLM.
  * It separates the static system prompt from the dynamic state message.
  */
+@Serializable
 data class MessageHistory(
-    val systemMessage: GeminiMessage?,
-    val stateMessage: GeminiMessage?,
-    val contextMessages: List<GeminiMessage> = emptyList() // For temporary, one-off messages
+    var systemMessage: GeminiMessage?,
+    var stateMessage: GeminiMessage?,
+    val contextMessages: MutableList<GeminiMessage> = mutableListOf() // For temporary, one-off messages
 ) {
     /**
      * Assembles all messages in the correct order for the LLM API call.
@@ -58,10 +61,12 @@ data class MessageHistory(
  * The complete, self-contained state of the MemoryManager.
  * This can be saved and loaded to resume an agent's session.
  */
+@Serializable
 data class MemoryState(
     val history: MessageHistory = MessageHistory(null, null),
-    val agentHistoryItems: List<HistoryItem> = listOf(
+    val toolId: Int = 1,
+    val agentHistoryItems: MutableList<HistoryItem> = mutableListOf(
         HistoryItem(stepNumber = 0, systemMessage = "Agent initialized")
     ),
-    val readStateDescription: String = ""
+    var readStateDescription: String = ""
 )

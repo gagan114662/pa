@@ -1,5 +1,7 @@
 package com.blurr.voice.v2.perception
 
+import android.util.Log
+import kotlinx.serialization.Serializable
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.StringReader
@@ -14,11 +16,19 @@ import java.io.StringReader
  * @property children A list of child [XmlNode]s.
  * @property parent A nullable reference to the parent [XmlNode].
  */
+@Serializable
 data class XmlNode(
     val attributes: MutableMap<String, String> = mutableMapOf(),
     val children: MutableList<XmlNode> = mutableListOf(),
     var parent: XmlNode? = null
 ) {
+
+    override fun toString(): String {
+        val text = getVisibleText().let { if (it.isNotBlank()) "text='$it'" else "" }
+        val resId = attributes["resource-id"]?.let { "id='$it'" } ?: ""
+        return "XmlNode($text $resId, children=${children.size})"
+    }
+
     /**
      * A descriptive string of the node's boolean properties that are true.
      * Example: "This element is enabled, clickable, focused."
@@ -59,8 +69,20 @@ data class XmlNode(
      * Determines if a node is interactive (clickable or long-clickable).
      */
     fun isInteractive(): Boolean {
-        return attributes["clickable"] == "true" ||
-                attributes["long-clickable"] == "true"
+        if (attributes["enabled"] == "false") {
+            return false
+        }
+        if (attributes["clickable"] == "true" ||
+            attributes["long-clickable"] == "true" ||
+            attributes["checkable"] == "true" ||
+            attributes["scrollable"] == "true" ||
+            attributes["class"] == "android.widget.EditText" ||
+            attributes["password"] == "true" ||
+            attributes["focusable"] == "true") {
+            return true
+        }
+
+        return false
     }
 
     /**
@@ -71,6 +93,31 @@ data class XmlNode(
         return attributes["text"]?.takeIf { it.isNotBlank() }
             ?: attributes["content-desc"]?.takeIf { it.isNotBlank() }
             ?: ""
+    }
+
+    /**
+     * Checks if the node's bounds are physically within the screen dimensions.
+     * An element is considered visible if it has at least one pixel on the screen.
+     */
+    fun isVisibleOnScreen(screenWidth: Int, screenHeight: Int): Boolean {
+        val boundsStr = attributes["bounds"] ?: return false
+
+        val regex = """\[(\d+),(\d+)\]\[(\d+),(\d+)\]""".toRegex()
+        val matchResult = regex.find(boundsStr) ?: return false
+
+        return try {
+            val (left, top, right, bottom) = matchResult.destructured.toList().map { it.toInt() }
+
+            // Element is invisible if it's entirely off-screen
+            if (right <= 0 || left >= screenWidth || bottom <= 0 || top >= screenHeight) {
+                return false
+            }
+
+            // If it's not entirely off-screen, it's visible
+            true
+        } catch (e: NumberFormatException) {
+            false
+        }
     }
 }
 
@@ -86,7 +133,8 @@ class SemanticParser {
     // Stores a map of Integer index -> XmlNode for interactive elements from the last parse.
     private val interactiveNodeMap = mutableMapOf<Int, XmlNode>()
     private var interactiveElementCounter = 0
-
+    private var screenWidth: Int = 0
+    private var screenHeight: Int = 0
     // --- New Public API ---
 
     /**
@@ -103,8 +151,10 @@ class SemanticParser {
      * used to detect new elements. A good identifier is "text|resource-id|class".
      * @return A formatted string representing the UI hierarchy.
      */
-    fun toHierarchicalString(xmlString: String, previousNodes: Set<String>? = null): Pair<String,  Map<Int, XmlNode>> {
+    fun toHierarchicalString(xmlString: String, previousNodes: Set<String>? = null, screenWidth: Int, screenHeight: Int): Pair<String,  Map<Int, XmlNode>> {
         val rootNode = buildTreeFromXml(xmlString) ?: return Pair("", emptyMap())
+        this.screenWidth = screenWidth
+        this.screenHeight = screenHeight
 
         // Prune the tree to remove noise before generating the string.
         val prunedChildren = rootNode.children.flatMap { prune(it) }
@@ -232,7 +282,9 @@ class SemanticParser {
         node.children.clear()
         node.children.addAll(newChildren)
         newChildren.forEach { it.parent = node }
-
+        if (!node.isVisibleOnScreen(screenWidth, screenHeight)) {
+            return node.children
+        }
         // 2. Decide what to do with the current node.
         return if (node.isSemanticallyImportant() || node.children.isNotEmpty()) {
             // Keep this node. Its (potentially promoted) children are already attached.

@@ -1,6 +1,8 @@
 package com.blurr.voice.v2
 
 import android.content.Context
+import android.util.Log
+import com.blurr.voice.v2.actions.Action
 import com.blurr.voice.v2.fs.FileSystem
 import com.blurr.voice.v2.llm.GeminiMessage
 import com.blurr.voice.v2.llm.MessageRole
@@ -27,14 +29,44 @@ class SystemPromptLoader(private val context: Context) {
      * @return A GeminiMessage containing the fully formatted system prompt.
      */
     fun getSystemMessage(settings: AgentSettings): GeminiMessage {
+        val actionsDescription = generateActionsDescription()
+
         var prompt = settings.overrideSystemMessage ?: loadDefaultTemplate()
             .replace("{max_actions}", settings.maxActionsPerStep.toString())
+            .replace("{available_actions}", actionsDescription)
+
 
         if (!settings.extendSystemMessage.isNullOrBlank()) {
             prompt += "\n${settings.extendSystemMessage}"
         }
-
+        Log.d("SYSTEM_PROMPT_BUILDER", prompt)
         return GeminiMessage(role = MessageRole.MODEL, parts = listOf(TextPart(prompt)))
+    }
+    /**
+     * NEW: This function generates a structured, LLM-friendly description
+     * of all available actions using the single source of truth in Action.kt.
+     */
+    private fun generateActionsDescription(): String {
+        val allActionSpecs = Action.getAllSpecs()
+        return buildString {
+            allActionSpecs.forEach { spec ->
+                append("<action>\n")
+                append("  <name>${spec.name}</name>\n")
+                append("  <description>${spec.description}</description>\n")
+                if (spec.params.isNotEmpty()) {
+                    append("  <parameters>\n")
+                    spec.params.forEach { param ->
+                        append("    <param>\n")
+                        append("      <name>${param.name}</name>\n")
+                        append("      <type>${param.type.simpleName}</type>\n")
+                        append("      <description>${param.description}</description>\n")
+                        append("    </param>\n")
+                    }
+                    append("  </parameters>\n")
+                }
+                append("</action>\n\n")
+            }
+        }.trim()
     }
 
     private fun loadDefaultTemplate(): String {
@@ -63,7 +95,8 @@ object UserMessageBuilder {
         val readStateDescription: String?,
         val stepInfo: AgentStepInfo?,
         val sensitiveDataDescription: String?,
-        val availableFilePaths: List<String>?
+        val availableFilePaths: List<String>?,
+        val maxUiRepresentationLength: Int = 40000
     )
 
     /**
@@ -83,7 +116,7 @@ object UserMessageBuilder {
             append("\n</agent_state>\n\n")
 
             append("<android_state>\n")
-            append(buildAndroidStateBlock(args.screenState))
+            append(buildAndroidStateBlock(args.screenState, args.maxUiRepresentationLength))
             append("\n</android_state>\n\n")
 
             if (!args.readStateDescription.isNullOrBlank()) {
@@ -96,17 +129,29 @@ object UserMessageBuilder {
         return GeminiMessage(text = messageContent.trim())
     }
 
-    private fun buildAndroidStateBlock(screenState: ScreenState): String {
+    private fun buildAndroidStateBlock(screenState: ScreenState, maxUiRepresentationLength: Int): String {
+        val originalUiString = screenState.uiRepresentation
+        val truncationMessage: String
+        val finalUiString: String
+
+        if (originalUiString.length > maxUiRepresentationLength) {
+            finalUiString = originalUiString.substring(0, maxUiRepresentationLength)
+            truncationMessage = " (truncated to $maxUiRepresentationLength characters)"
+        } else {
+            finalUiString = originalUiString
+            truncationMessage = ""
+        }
+
         return buildString {
             appendLine("Current Activity: ${screenState.activityName}")
-            appendLine("Visible elements on the current screen:")
-            append(screenState.uiRepresentation)
+            appendLine("Visible elements on the current screen:$truncationMessage")
+            append(finalUiString)
         }.trim()
     }
 
     private fun buildAgentStateBlock(args: Args): String {
         val todoContents = args.fileSystem.getTodoContents().let {
-            if (it.isBlank()) "[Current todo.md is empty, fill it with your plan when applicable]" else it
+            it.ifBlank { "[Current todo.md is empty, fill it with your plan when applicable]" }
         }
 
         val stepInfoDescription = args.stepInfo?.let {

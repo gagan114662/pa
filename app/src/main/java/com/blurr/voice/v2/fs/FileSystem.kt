@@ -33,27 +33,53 @@ class FileSystem(context: Context, workspaceName: String = "agent_workspace") {
         val baseDir = context.filesDir
         workspaceDir = File(baseDir, workspaceName)
 
-        // Safety Check: For a new session, the workspace should not already exist.
-        if (workspaceDir.exists()) {
-            // Instead of throwing an error, a more robust approach for Android might be to clear it.
-            // For now, we will log a warning. For a strict safety check, you could throw an exception.
+        // Ensure the directory exists
+        if (!workspaceDir.exists()) {
+            workspaceDir.mkdirs()
+            Log.i(TAG, "Created new workspace directory at: ${workspaceDir.absolutePath}")
+        } else {
             Log.w(TAG, "Workspace directory '$workspaceName' already exists. Reusing it.")
-            // throw IllegalStateException("Workspace directory '$workspaceName' already exists. Please clear it or use a new name.")
         }
 
-        // Ensure the directory exists
-        workspaceDir.mkdirs()
+        // --- Archiving and Initialization Logic ---
+        archiveOldTodoFile()
 
-        // Initialize default files
-        todoFile = File(workspaceDir, "todo.md")
-        resultsFile = File(workspaceDir, "results.md")
+        // Initialize file handles for the class properties
+        this.todoFile = File(workspaceDir, "todo.md")
+        this.resultsFile = File(workspaceDir, "results.md")
 
         try {
-            if (!todoFile.exists()) todoFile.createNewFile()
-            if (!resultsFile.exists()) resultsFile.createNewFile()
+            // Always ensure a fresh, empty todo.md is present
+            if (this.todoFile.exists()) this.todoFile.delete()
+            this.todoFile.createNewFile()
+
+            // Create results.md only if it doesn't already exist, preserving its content across sessions.
+            if (!this.resultsFile.exists()) this.resultsFile.createNewFile()
         } catch (e: IOException) {
             Log.e(TAG, "Failed to create initial files in workspace.", e)
             throw e // Re-throw as this is a critical failure
+        }
+    }
+
+    /**
+     * Checks for an existing todo.md file and renames it with a timestamp to archive it.
+     */
+    private fun archiveOldTodoFile() {
+        val oldTodoFile = File(workspaceDir, "todo.md")
+        // Only archive if the file exists and is not empty
+        if (oldTodoFile.exists() && oldTodoFile.length() > 0) {
+            val timestamp = System.currentTimeMillis()
+            val archiveFileName = "todo_ARCHIVED_$timestamp.md"
+            val archiveFile = File(workspaceDir, archiveFileName)
+            try {
+                if (oldTodoFile.renameTo(archiveFile)) {
+                    Log.i(TAG, "Successfully archived old todo.md to $archiveFileName")
+                } else {
+                    Log.w(TAG, "Failed to archive old todo.md.")
+                }
+            } catch (e: SecurityException) {
+                Log.e(TAG, "Security error while trying to archive todo.md.", e)
+            }
         }
     }
 
@@ -151,9 +177,12 @@ class FileSystem(context: Context, workspaceName: String = "agent_workspace") {
      *
      * @return A formatted string describing the file system state.
      */
+
     fun describe(): String {
         return try {
-            val files = workspaceDir.listFiles { file -> file.isFile }
+            val files = workspaceDir.listFiles { file ->
+                file.isFile && !file.name.startsWith("todo_ARCHIVED_")
+            }
             if (files.isNullOrEmpty()) {
                 return "The file system is empty."
             }
@@ -170,6 +199,7 @@ class FileSystem(context: Context, workspaceName: String = "agent_workspace") {
             "Error: Could not describe file system."
         }
     }
+
 
     /**
      * A synchronous helper to quickly get the contents of the 'todo.md' file.

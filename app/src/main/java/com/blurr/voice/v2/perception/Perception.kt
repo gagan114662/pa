@@ -35,20 +35,19 @@ class Perception(
         val screenshotDeferred = async { eyes.openEyes() }
         val rawDataDeferred = async { eyes.getRawScreenData() }
         val keyboardStatusDeferred = async { eyes.getKeyBoardStatus() }
-
+        val currentActivity = async { eyes.getCurrentActivityName() }
         val screenshot = screenshotDeferred.await()
         val rawData = rawDataDeferred.await() ?: RawScreenData(
-            "<hierarchy error=\"service not available\"/>",
-            0,
-            0
+            "<hierarchy error=\"service not available\"/>", 0, 0, 0,0
         )
         val isKeyboardOpen = keyboardStatusDeferred.await()
 
         // Assume you have a way to get this
-        val activityName = "com.example.SomeActivity"
+        val activityName = currentActivity.await()
 
         // Parse the XML from the raw data
-        val parseResult = semanticParser.toHierarchicalString(rawData.xml, previousState)
+
+        val parseResult = semanticParser.toHierarchicalString(rawData.xml, previousState, rawData.screenWidth, rawData.screenHeight)
         var uiRepresentation = parseResult.first
         val elementMap = parseResult.second
 

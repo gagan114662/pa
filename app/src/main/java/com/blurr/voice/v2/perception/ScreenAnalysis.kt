@@ -1,6 +1,7 @@
 package com.blurr.voice.v2.perception
 
 import android.graphics.Bitmap
+import kotlinx.serialization.Serializable
 
 /**
  * A data class that holds a complete analysis of the screen at a single point in time.
@@ -13,6 +14,7 @@ import android.graphics.Bitmap
  * @param elementMap A map from the integer ID `[1]` in the uiRepresentation to the
  * actual XmlNode object, allowing the ActionExecutor to find center coordinates.
  */
+@Serializable
 data class ScreenAnalysis(
     val uiRepresentation: String,
     val isKeyboardOpen: Boolean,

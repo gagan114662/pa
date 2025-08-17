@@ -2,21 +2,27 @@ package com.blurr.voice.v2.actions
 
 import com.blurr.voice.agent.v1.AgentConfig
 import com.blurr.voice.agent.v1.InfoPool
-import org.json.JSONObject
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.*
 import kotlin.reflect.KClass
 
 // Data class to hold parameter metadata without reflection
 data class ParamSpec(val name: String, val type: KClass<*>, val description: String)
 
-/**
+/** 
  * A sealed class representing all possible type-safe commands the agent can execute.
- * The companion object acts as a registry for metadata and construction.
+ * It is annotated to use the custom, data-driven ActionSerializer.
  */
+@Serializable(with = Action.ActionSerializer::class)
 sealed class Action {
-    // Each action is a data class (if it has args) or an object (if it doesn't)
+    // Each action is a data class (if it has args) or an object (if it doesn't).
+    // Note: Property names here follow Kotlin's camelCase convention.
     data class TapElement(val elementId: Int) : Action()
-//    data class Swipe(val x1: Int, val y1: Int, val x2: Int, val y2: Int) : Action()
-//    data class Type(val text: String) : Action()
     data object SwitchApp : Action()
     data object Back : Action()
     data object Home : Action()
@@ -27,17 +33,58 @@ sealed class Action {
     data class ScrollDown(val amount: Int) : Action()
     data class ScrollUp(val amount: Int) : Action()
     data class SearchGoogle(val query: String) : Action()
-    data class ScrollToText(val text: String) : Action()
-    data class ExtractStructuredData(val query: String) : Action()
-    data class InputText(val index: Int, val text: String) : Action()
+    data class TapElementInputTextPressEnter(val index: Int, val text: String) : Action()
+    data class InputText(val text: String) : Action()
     data class WriteFile(val fileName: String, val content: String) : Action()
     data class AppendFile(val fileName: String, val content: String) : Action()
     data class ReadFile(val fileName: String) : Action()
     data class Done(val success: Boolean, val text: String, val filesToDisplay: List<String>? = null) : Action()
 
-    // --- Companion Object: The Registry and Metadata Provider ---
+    // --- The Custom Serializer ---
+    // This serializer is now data-driven, using the `allSpecs` map as its source of truth.
+    object ActionSerializer : KSerializer<Action> {
+        override val descriptor: SerialDescriptor = buildClassSerialDescriptor("Action")
+
+        override fun serialize(encoder: Encoder, value: Action) {
+            throw NotImplementedError("Serialization is not supported for this agent.")
+        }
+
+        override fun deserialize(decoder: Decoder): Action {
+            val jsonInput = (decoder as JsonDecoder).decodeJsonElement().jsonObject
+            val actionName = jsonInput.keys.first()
+            val paramsJson = jsonInput[actionName]?.jsonObject
+
+            // Look up the action's specification from our single source of truth.
+            val spec = allSpecs[actionName]
+                ?: throw IllegalArgumentException("Unknown action received from LLM: $actionName")
+
+            val args = mutableMapOf<String, Any?>()
+
+            // If the action has parameters, parse them according to the spec.
+            paramsJson?.let {
+                for (paramSpec in spec.params) {
+                    val paramName = paramSpec.name
+                    val jsonValue = it[paramName]
+                        ?: continue // Allow optional parameters
+
+                    // Convert JSON element to the correct Kotlin type.
+                    val value = when (paramSpec.type) {
+                        Int::class -> jsonValue.jsonPrimitive.int
+                        String::class -> jsonValue.jsonPrimitive.content
+                        Boolean::class -> jsonValue.jsonPrimitive.boolean
+                        List::class -> jsonValue.jsonArray.map { el -> el.jsonPrimitive.content }
+                        else -> throw IllegalStateException("Unsupported parameter type in Spec: ${paramSpec.type}")
+                    }
+                    args[paramName] = value
+                }
+            }
+            // Use the 'build' lambda from the spec to construct the final, type-safe Action object.
+            return spec.build(args)
+        }
+    }
+
+    // --- Companion Object: The Registry and Single Source of Truth ---
     companion object {
-        // Defines the metadata for an action and how to build it from raw arguments
         data class Spec(
             val name: String,
             val description: String,
@@ -45,151 +92,130 @@ sealed class Action {
             val build: (args: Map<String, Any?>) -> Action
         )
 
-        // The single source of truth for all action specifications
+        // The single source of truth for all actions.
+        // Keys and names are now consistently in snake_case for the LLM.
         private val allSpecs: Map<String, Spec> = mapOf(
-            "TapElement" to Spec(
-                name = "TapElement",
+            "tap_element" to Spec(
+                name = "tap_element",
                 description = "Tap the element with the specified numeric ID.",
                 params = listOf(ParamSpec("element_id", Int::class, "The numeric ID of the element.")),
                 build = { args -> TapElement(args["element_id"] as Int) }
             ),
-            "Switch_App" to Spec("Switch_App", "Show the App switcher.", emptyList()) { SwitchApp },
-            "Back" to Spec("Back", "Go back to the previous screen.", emptyList()) { Back },
-            "Home" to Spec("Home", "Go to the device's home screen.", emptyList()) { Home },
-            "Wait" to Spec("Wait", "Wait for 10 seconds for loading.", emptyList()) { Wait },
-            "Speak" to Spec(
-                name = "Speak",
+            "switch_app" to Spec("switch_app", "Show the App switcher.", emptyList()) { SwitchApp },
+            "back" to Spec("back", "Go back to the previous screen.", emptyList()) { Back },
+            "home" to Spec("home", "Go to the device's home screen.", emptyList()) { Home },
+            "wait" to Spec("wait", "Wait for a few seconds for loading.", emptyList()) { Wait },
+            "speak" to Spec(
+                name = "speak",
                 description = "Speak the 'message' to the user.",
                 params = listOf(ParamSpec("message", String::class, "The message to speak.")),
                 build = { args -> Speak(args["message"] as String) }
             ),
-            "Ask" to Spec(
-                name = "Ask",
+            "ask" to Spec(
+                name = "ask",
                 description = "Ask the 'question' to the user and await a response.",
                 params = listOf(ParamSpec("question", String::class, "The question to ask.")),
                 build = { args -> Ask(args["question"] as String) }
             ),
-            "Open_App" to Spec(
-                name = "Open_App",
+            "open_app" to Spec(
+                name = "open_app",
                 description = "Open the app named 'app_name'.",
                 params = listOf(ParamSpec("app_name", String::class, "The name of the app.")),
                 build = { args -> OpenApp(args["app_name"] as String) }
             ),
-            "Scroll_Down" to Spec(
-                name = "Scroll_Down",
-                description = "Scroll down by the specified amount of pixels (negative value).",
-                params = listOf(ParamSpec("amount", Int::class, "Amount of pixels to scroll down (use negative value)")),
+            "scroll_down" to Spec(
+                name = "scroll_down",
+                description = "Scroll down by the specified amount of pixels.",
+                params = listOf(ParamSpec("amount", Int::class, "Amount of pixels to scroll down.")),
                 build = { args -> ScrollDown(args["amount"] as Int) }
             ),
-            "Scroll_Up" to Spec(
-                name = "Scroll_Up",
-                description = "Scroll up by the specified amount of pixels (negative value).",
-                params = listOf(ParamSpec("amount", Int::class, "Amount of pixels to scroll up (use negative value)")),
+            "scroll_up" to Spec(
+                name = "scroll_up",
+                description = "Scroll up by the specified amount of pixels.",
+                params = listOf(ParamSpec("amount", Int::class, "Amount of pixels to scroll up.")),
                 build = { args -> ScrollUp(args["amount"] as Int) }
             ),
-            "Search_Google" to Spec(
-                name = "Search_Google",
+            "search_google" to Spec(
+                name = "search_google",
                 description = "Search Google with the specified query.",
                 params = listOf(ParamSpec("query", String::class, "The search query to perform on Google")),
                 build = { args -> SearchGoogle(args["query"] as String) }
             ),
-            "Scroll_To_Text" to Spec(
-                name = "Scroll_To_Text",
-                description = "Scrolls the page until the specified text is visible in the viewport. This is useful when an element is not currently visible.",
-                params = listOf(ParamSpec("text", String::class, "The text content to find and scroll to")),
-                build = { args -> ScrollToText(args["text"] as String) }
-            ),
-            "Extract_Structured_Data" to Spec(
-                name = "Extract_Structured_Data",
-                description = "Extracts specific, structured information from the current webpage based on a query. It's best used on detail pages (like a single product or article) rather than lists. The agent uses another LLM to parse the page content and answer the query.",
-                params = listOf(ParamSpec("query", String::class, "A question or description of the data to extract (e.g., 'what is the price and rating of this product?')")),
-                build = { args -> ExtractStructuredData(args["query"] as String) }
-            ),
-            "Input_Text_and_ENTER" to Spec(
-                name = "Input_Text",
-                description = "Enters text into an input field (like a search bar or a form field). And then triggers the enter event which search if you are using search engine, send text when messaging app etc",
+            "tap_element_input_text_and_enter" to Spec(
+                name = "tap_element_input_text_and_enter",
+                description = "Taps an element, inputs text, and presses enter. Useful for search bars.",
                 params = listOf(
-                    ParamSpec("index", Int::class, "The numerical index of the input element"),
-                    ParamSpec("text", String::class, "The text to be typed into the element")
+                    ParamSpec("index", Int::class, "The numerical index of the input element."),
+                    ParamSpec("text", String::class, "The text to be typed into the element.")
                 ),
-                build = { args -> InputText(args["index"] as Int, args["text"] as String) }
+                build = { args -> TapElementInputTextPressEnter(args["index"] as Int, args["text"] as String) }
             ),
-            "Done" to Spec(
-                name = "Done",
-                description = "Completes the current task. It is used to signal that the objective has been met or that the agent cannot proceed further.",
+            "done" to Spec(
+                name = "done",
+                description = "Completes the current task.",
                 params = listOf(
-                    ParamSpec("success", Boolean::class, "True if the task was completed successfully, False otherwise"),
-                    ParamSpec("text", String::class, "A summary of the results or a final message for the user"),
-                    ParamSpec("files_to_display", List::class, "A list of filenames (e.g., ['report.pdf']) that should be presented to the user as attachments")
+                    ParamSpec("success", Boolean::class, "True if the task was completed successfully, False otherwise."),
+                    ParamSpec("text", String::class, "A summary of the results or a final message for the user."),
+                    ParamSpec("files_to_display", List::class, "A list of filenames (e.g., ['report.pdf']) to show the user.")
                 ),
-                build = { args -> 
-                    val filesToDisplay = args["files_to_display"] as? List<String>
-                    Done(args["success"] as Boolean, args["text"] as String, filesToDisplay)
+                build = { args ->
+                    @Suppress("UNCHECKED_CAST")
+                    Done(
+                        args["success"] as Boolean,
+                        args["text"] as String,
+                        args["files_to_display"] as? List<String>
+                    )
                 }
             ),
-            "WriteFile" to Spec(
-                name = "WriteFile",
-                description = "Write content to file_name in file system, use only .md or .txt extensions.",
+            "write_file" to Spec(
+                name = "write_file",
+                description = "Write content to a file, overwriting existing content.",
                 params = listOf(
-                    ParamSpec("file_name", String::class, "The name of the file (e.g., 'report.md' or 'notes.txt')."),
+                    ParamSpec("file_name", String::class, "The name of the file (e.g., 'notes.txt')."),
                     ParamSpec("content", String::class, "The content to write to the file.")
                 ),
                 build = { args -> WriteFile(args["file_name"] as String, args["content"] as String) }
             ),
-            "AppendFile" to Spec(
-                name = "AppendFile",
-                description = "Append content to file_name in file system.",
+            "append_file" to Spec(
+                name = "append_file",
+                description = "Append content to the end of a file.",
                 params = listOf(
                     ParamSpec("file_name", String::class, "The name of the file to append to."),
                     ParamSpec("content", String::class, "The content to append.")
                 ),
                 build = { args -> AppendFile(args["file_name"] as String, args["content"] as String) }
             ),
-            "ReadFile" to Spec(
-                name = "ReadFile",
-                description = "Read file_name from file system.",
-                params = listOf(
-                    ParamSpec("file_name", String::class, "The name of the file to read.")
-                ),
+            "read_file" to Spec(
+                name = "read_file",
+                description = "Read the entire content of a file.",
+                params = listOf(ParamSpec("file_name", String::class, "The name of the file to read.")),
                 build = { args -> ReadFile(args["file_name"] as String) }
-            )
-//            "Swipe" to Spec(
-//                name = "Swipe",
-//                description = "Swipe from (x1, y1) to (x2, y2).",
-//                params = listOf(
-//                    ParamSpec("x1", Int::class, "Start X"), ParamSpec("y1", Int::class, "Start Y"),
-//                    ParamSpec("x2", Int::class, "End X"), ParamSpec("y2", Int::class, "End Y")
-//                ),
-//                build = { args -> Swipe(args["x1"] as Int, args["y1"] as Int, args["x2"] as Int, args["y2"] as Int) }
-//            ),
-            // "Type" to Spec(
-            //     name = "Type",
-            //     description = "Type the 'text' into a focused input box.",
-            //     params = listOf(ParamSpec("text", String::class, "The text to type.")),
-            //     build = { args -> Type(args["text"] as String) }
-            // ),
+            ),
+            "type" to Spec(
+                name = "type",
+                description = "Type text into a focused input field.",
+                params = listOf(ParamSpec("text", String::class, "The text to type.")),
+                build = { args -> InputText(args["text"] as String) }
+            ),
         )
 
-        /**
-         * Returns the specifications for all actions, respecting the agent's configuration.
-         */
-        fun getAvailableSpecs(config: AgentConfig, infoPool: InfoPool): List<Spec> {
-            return allSpecs.values.filter { spec ->
-                when (spec.name) {
-                    "Open_App" -> config.enableDirectAppOpening
-                    "Type" -> infoPool.keyboardPre
-                    else -> true
-                }
-            }
-        }
-
 //        /**
-//         * Safely constructs an Action object from a name and a map of arguments.
+//         * Returns the specifications for all actions, respecting the agent's configuration.
 //         */
-//        fun fromJson(name: String, argsJson: JSONObject?): Action {
-//            val spec = allSpecs[name] ?: throw IllegalArgumentException("Unknown action name: $name")
-//            val argsMap = argsJson?.toMap() ?: emptyMap<String, Any?>()
-//            return spec.build(argsMap)
+//        fun getAvailableSpecs(config: AgentConfig, infoPool: InfoPool): List<Spec> {
+//            return allSpecs.values.filter { spec ->
+//                when (spec.name) {
+//                    "open_app" -> config.enableDirectAppOpening
+//                    "type" -> infoPool.keyboardPre
+//                    else -> true
+//                }
+//            }
 //        }
+
+        // Add this function inside the companion object in v2/actions/Action.kt
+
+        fun getAllSpecs(): Collection<Spec> {
+            return allSpecs.values
+        }
     }
 }

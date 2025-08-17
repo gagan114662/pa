@@ -8,6 +8,7 @@ import kotlinx.serialization.Serializable
 
 // --- Type Aliases and Placeholders ---
 // Using a typealias to link the concept of a historical screen state to our existing ScreenAnalysis class.
+
 typealias ScreenState = ScreenAnalysis
 
 // Placeholders for classes that we will define in other modules later.
@@ -63,12 +64,6 @@ data class AgentSettings(
     val toolCallingMethod: ToolCallingMethod? = ToolCallingMethod.AUTO,
     val includeToolCallExamples: Boolean = false,
 
-    // Planner Configuration
-    val plannerLlm: String? = null, // Using String as a placeholder for the model identifier
-    val plannerInterval: Int = 1,
-    val isPlannerReasoning: Boolean = false,
-    val extendPlannerSystemMessage: String? = null,
-
     // Extraction LLM
     val pageExtractionLlm: String? = null // Using String as a placeholder
 )
@@ -82,7 +77,7 @@ data class AgentState(
     var nSteps: Int = 1,
     var consecutiveFailures: Int = 0,
     var lastResult: List<ActionResult>? = null,
-    var lastPlan: String? = null,
+    var lastPlan: String? = null, //todo check if needed else remove this
     var lastModelOutput: AgentOutput? = null,
     var paused: Boolean = false,
     var stopped: Boolean = false,
@@ -185,21 +180,21 @@ data class AgentHistory(
          * Finds the UI elements that were interacted with in this history step
          * by mapping action element IDs to the element map in the screen state.
          */
-        fun getInteractedElements(modelOutput: AgentOutput?, screenState: ScreenState): List<XmlNode?> {
-            if (modelOutput == null) return emptyList()
-
-            return modelOutput.action.map { action ->
-                // Determine the element ID based on the type of action
-                val elementId = when (action) {
-                    is Action.TapElement -> action.elementId
-                    is Action.InputText -> action.index
-                    // Add other element-targeting actions here if necessary
-                    else -> null
-                }
-                // Look up the ID in the screen state's element map
-                elementId?.let { screenState.elementMap[it] }
-            }
-        }
+//        fun getInteractedElements(modelOutput: AgentOutput?, screenState: ScreenState): List<XmlNode?> {
+//            if (modelOutput == null) return emptyList()
+//
+//            return modelOutput.action.map { action ->
+//                // Determine the element ID based on the type of action
+//                val elementId = when (action) {
+//                    is Action.TapElement -> action.elementId
+//                    is Action.InputText -> action.index
+//                    // Add other element-targeting actions here if necessary
+//                    else -> null
+//                }
+//                // Look up the ID in the screen state's element map
+//                elementId?.let { screenState.elementMap[it] }
+//            }
+//        }
     }
 }
 
