@@ -37,11 +37,8 @@ import androidx.core.net.toUri
 import com.blurr.voice.agent.v1.VisionHelper
 import com.blurr.voice.utilities.getReasoningModelApiResponse
 import android.view.View
-import com.blurr.voice.agent.v2.prompts.SystemPrompt
 import com.blurr.voice.services.AgentTaskService
 import com.blurr.voice.utilities.PermissionManager
-import com.blurr.voice.v2.actions.Action
-import com.blurr.voice.v2.actions.ActionExecutor
 
 class MainActivity : AppCompatActivity() {
 
@@ -56,7 +53,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var voiceInputButton: ImageButton
     private lateinit var voiceStatusText: TextView
     private lateinit var settingsButton: ImageButton
-    // REMOVED settings-related UI variables
 
     private lateinit var ttsManager: TTSManager
     private lateinit var sttManager: STTManager
@@ -70,7 +66,6 @@ class MainActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (isGranted) {
                 Toast.makeText(this, "Microphone permission granted!", Toast.LENGTH_SHORT).show()
-                // The onResume will handle updating the UI
             } else {
                 Toast.makeText(this, "Permission denied.", Toast.LENGTH_SHORT).show()
             }
@@ -105,7 +100,6 @@ class MainActivity : AppCompatActivity() {
         println(userId)
         askForNotificationPermission()
         checkAndRequestOverlayPermission()
-        // Initialize permission manager
         permissionManager = PermissionManager(this)
         permissionManager.initializePermissionLauncher()
         permissionManager.requestAllPermissions()
@@ -122,7 +116,6 @@ class MainActivity : AppCompatActivity() {
 
         conversationalAgentButton = findViewById(R.id.conversationalAgentButton)
         settingsButton = findViewById(R.id.settingsButton)
-        // REMOVED findViewById for settings views
 
         grantPermission.setOnClickListener {
             permissionManager.openAccessibilitySettings()
@@ -136,7 +129,6 @@ class MainActivity : AppCompatActivity() {
         setupClickListeners()
         setupVoiceInput()
         setupSettingsButton()
-        // REMOVED call to setupVisionModeListener()
 
         handler = Handler(Looper.getMainLooper())
 
@@ -156,33 +148,6 @@ class MainActivity : AppCompatActivity() {
             intent.data = url.toUri()
             startActivity(intent)
         }
-//
-//        lifecycleScope.launch {
-//            // Ensure permissions are ready before starting the test
-//            while (!isAccessibilityServiceEnabled()) {
-//                delay(1000) // wait until the service is enabled
-//            }
-//
-//            // Go to home screen to have a scrollable surface for testing
-////            finger.home()
-//            delay(10000) // wait for home screen to settle
-//            val finger = Finger(this@MainActivity)
-//            val actionExecutor = ActionExecutor(finger)
-//val info =InfoPool("dfsdfdv")
-//            while (true) {
-//                // Scroll down by 400 pixels
-//                actionExecutor.execute(Action.ScrollDown(1000),info, this@MainActivity )
-//                Log.d("ScrollTest", "Scrolled Down")
-//                // Wait for 1 second
-//                delay(1000)
-//
-//                // Scroll up by 400 pixels
-//                actionExecutor.execute(Action.ScrollUp(1000),info, this@MainActivity )
-//                Log.d("ScrollTest", "Scrolled Up")
-//                // Wait for 1 second
-//                delay(1000)
-//            }
-//        }
     }
 
     @SuppressLint("SetTextI18n")
@@ -254,7 +219,6 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    // REMOVED setupVisionModeListener()
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupVoiceInput() {
@@ -312,28 +276,6 @@ class MainActivity : AppCompatActivity() {
             }
         )
     }
-
-    // New function to start the service
-    private fun setUpConversationalAgent() {
-        conversationalAgentButton.setOnClickListener {
-            if (!ConversationalAgentService.isRunning) {
-//                handler.postDelayed({ updateUI() }, 500)
-                Log.d("ConvAgent", "Checking")
-                Log.d("MainActivity", "Permission granted, starting ConversationalAgentService.")
-                val serviceIntent = Intent(this, ConversationalAgentService::class.java)
-                ContextCompat.startForegroundService(this, serviceIntent)
-                Toast.makeText(this, "Conversation agent is active", Toast.LENGTH_SHORT).show()
-                handler.postDelayed({ updateUI() }, 100)
-            }else{
-                Log.d("MainActivity", "Stopping ConversationalAgentService.")
-                stopService(Intent(this, ConversationalAgentService::class.java))
-                Toast.makeText(this, "Conversation ended", Toast.LENGTH_SHORT).show()
-                handler.postDelayed({ updateUI() }, 100)
-            }
-        }
-
-    }
-
 
     private fun performTaskFromVoiceInput(instruction: String) {
         // ... (this logic remains unchanged)
