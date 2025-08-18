@@ -3,11 +3,10 @@ package com.blurr.voice.services
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
@@ -16,12 +15,12 @@ import android.view.WindowManager
 import android.widget.Button
 import androidx.core.content.ContextCompat
 import com.blurr.voice.ConversationalAgentService
+import com.blurr.voice.R
 
 class FloatingPandaButtonService : Service() {
 
     private var windowManager: WindowManager? = null
     private var floatingButton: View? = null
-    private val handler = Handler(Looper.getMainLooper())
 
     companion object {
         private const val TAG = "FloatingPandaButton"
@@ -36,7 +35,7 @@ class FloatingPandaButtonService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "Floating Panda Button Service starting...")
-        
+
         if (!Settings.canDrawOverlays(this)) {
             Log.w(TAG, "Cannot show floating button: 'Draw over other apps' permission not granted.")
             stopSelf()
@@ -55,7 +54,7 @@ class FloatingPandaButtonService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        
+
         return START_STICKY
     }
 
@@ -69,7 +68,7 @@ class FloatingPandaButtonService : Service() {
 
         try {
             // Create the button programmatically
-            floatingButton = createButtonProgrammatically()
+            floatingButton = createFloatingView()
             val button = floatingButton as Button
 
             // Set up the button click listener
@@ -78,16 +77,8 @@ class FloatingPandaButtonService : Service() {
                 triggerPandaActivation()
             }
 
-            // Calculate position near the battery icon (top-right area)
             val displayMetrics = resources.displayMetrics
-            val screenWidth = displayMetrics.widthPixels
-            val screenHeight = displayMetrics.heightPixels
-            
-            // Position the button in the bottom-right area
-            val buttonWidth = (70 * displayMetrics.density).toInt() // 100dp for smaller size
-            val buttonHeight = (33 * displayMetrics.density).toInt() // 40dp for smaller height
-            val marginFromBottom = (0 * displayMetrics.density).toInt() // 100dp from bottom
-            val marginFromRight = (16 * displayMetrics.density).toInt() // 16dp from right edge
+            val margin = (16 * displayMetrics.density).toInt() // 16dp margin
 
             val windowType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -96,16 +87,16 @@ class FloatingPandaButtonService : Service() {
             }
 
             val params = WindowManager.LayoutParams(
-                buttonWidth,
-                buttonHeight,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
                 windowType,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                         WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT
             ).apply {
                 gravity = Gravity.BOTTOM or Gravity.END
-                x = marginFromRight
-                y = marginFromBottom
+                x = margin
+                y = margin
             }
 
             windowManager?.addView(floatingButton, params)
@@ -116,24 +107,26 @@ class FloatingPandaButtonService : Service() {
         }
     }
 
-    private fun createButtonProgrammatically(): Button {
+    private fun createFloatingView(): Button {
         return Button(this).apply {
-            text = "Hey Panda!"
-            textSize = 12f
-            setTextColor(android.graphics.Color.WHITE)
-            setBackgroundColor(android.graphics.Color.parseColor("#BE63F3"))
-            // setPadding(, 1, 2, 1)
-            isClickable = true
-            isFocusable = true
-            
-            // Add some styling to make it look better
-            elevation = 8f
-            alpha = 0.9f
+            text = "Hey Panda"
+            // Prevent text from being all caps for a softer look
+            isAllCaps = false
+            setTextColor(Color.WHITE)
+            // Use the new pill-shaped background
+            background = ContextCompat.getDrawable(context, R.drawable.floating_panda_text_background)
+
+            // Add elevation for a floating shadow effect
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                elevation = 8f * resources.displayMetrics.density
+                // Remove the default button press animation for a cleaner look
+                stateListAnimator = null
+            }
         }
     }
 
+
     private fun triggerPandaActivation() {
-        // This is the same action that happens when wake word is detected
         try {
             if (!ConversationalAgentService.isRunning) {
                 Log.d(TAG, "Starting ConversationalAgentService from floating button")
@@ -152,8 +145,6 @@ class FloatingPandaButtonService : Service() {
             try {
                 if (button.isAttachedToWindow) {
                     windowManager?.removeView(button)
-                } else {
-                    // Button is not attached, just continue
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error removing floating button", e)
@@ -172,4 +163,4 @@ class FloatingPandaButtonService : Service() {
     override fun onBind(intent: Intent?): IBinder? {
         return null
     }
-} 
+}
