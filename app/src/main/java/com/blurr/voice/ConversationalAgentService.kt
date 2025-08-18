@@ -59,6 +59,7 @@ class ConversationalAgentService : Service() {
     private var conversationHistory = listOf<Pair<String, List<Any>>>()
     private val ttsManager by lazy { TTSManager.getInstance(this) }
     private val clarificationQuestionViews = mutableListOf<View>()
+    private var transcriptionView: TextView? = null
 
     // Add these at the top of your ConversationalAgentService class
     private var clarificationAttempts = 0
@@ -121,7 +122,7 @@ class ConversationalAgentService : Service() {
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
-    private suspend fun speakAndThenListen(text: String, draw: Boolean = true) { // Default draw to true
+    private suspend fun speakAndThenListen(text: String, draw: Boolean = true) {
         // Update system prompt with relevant memories before processing
         updateSystemPromptWithMemories()
         if (draw) {
@@ -136,11 +137,24 @@ class ConversationalAgentService : Service() {
 
         speechCoordinator.startListening(
             onResult = { recognizedText ->
-                Log.d("ConvAgent", "User said: $recognizedText")
+                Log.d("ConvAgent", "Final user transcription: $recognizedText")
+                mainHandler.post {
+                    // 1. Show the final result in the transcription view
+                    updateTranscriptionView(recognizedText)
+                    // 2. Schedule the view to be hidden after 500ms
+                    mainHandler.postDelayed({
+                        hideTranscriptionView()
+                    }, 500)
+                }
+                // 3. Start processing the user's request immediately
                 processUserInput(recognizedText)
             },
             onError = { error ->
                 Log.e("ConvAgent", "STT Error: $error")
+                // On error, hide the transcription view immediately
+                mainHandler.post {
+                    hideTranscriptionView()
+                }
                 sttErrorAttempts++
 
                 serviceScope.launch {
@@ -154,13 +168,84 @@ class ConversationalAgentService : Service() {
                     }
                 }
             },
+            onPartialResult = { partialText ->
+                mainHandler.post {
+                    updateTranscriptionView(partialText)
+                }
+            },
             onListeningStateChange = { listening ->
                 Log.d("ConvAgent", "Listening state: $listening")
+                mainHandler.post {
+                    if (listening) {
+                        showTranscriptionView()
+                    }
+                    // IMPORTANT: We no longer hide the view here.
+                    // Hiding is now controlled by onResult and onError to allow for the delay.
+                }
             }
         )
         ttsManager.setCaptionsEnabled(true)
     }
 
+    // START: ADD THESE NEW METHODS AT THE END OF THE CLASS, before onDestroy()
+    private fun showTranscriptionView() {
+        if (transcriptionView != null) return // Already showing
+
+        mainHandler.post {
+            transcriptionView = TextView(this).apply {
+                text = "Listening..."
+                val glassBackground = GradientDrawable(
+                    GradientDrawable.Orientation.TL_BR,
+                    intArrayOf(0xDD0D0D2E.toInt(), 0xDD2A0D45.toInt())
+                ).apply {
+                    cornerRadius = 28f
+                    setStroke(1, 0x80FFFFFF.toInt())
+                }
+                background = glassBackground
+                setTextColor(0xFFE0E0E0.toInt())
+                textSize = 16f
+                setPadding(40, 24, 40, 24)
+                typeface = Typeface.MONOSPACE
+            }
+
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                PixelFormat.TRANSLUCENT
+            ).apply {
+                gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                y = 250 // Position it 250px above the bottom edge
+            }
+
+            try {
+                windowManager.addView(transcriptionView, params)
+            } catch (e: Exception) {
+                Log.e("ConvAgent", "Failed to add transcription view.", e)
+                transcriptionView = null
+            }
+        }
+    }
+
+    private fun updateTranscriptionView(text: String) {
+        transcriptionView?.text = text
+    }
+
+    private fun hideTranscriptionView() {
+        mainHandler.post {
+            transcriptionView?.let {
+                if (it.isAttachedToWindow) {
+                    try {
+                        windowManager.removeView(it)
+                    } catch (e: Exception) {
+                        Log.e("ConvAgent", "Error removing transcription view.", e)
+                    }
+                }
+            }
+            transcriptionView = null
+        }
+    }
     // --- CHANGED: Rewritten to process the new custom text format ---
     @RequiresApi(Build.VERSION_CODES.O)
     private fun processUserInput(userInput: String) {

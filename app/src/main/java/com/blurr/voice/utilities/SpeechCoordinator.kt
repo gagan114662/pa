@@ -162,7 +162,8 @@ class SpeechCoordinator private constructor(private val context: Context) {
     suspend fun startListening(
         onResult: (String) -> Unit,
         onError: (String) -> Unit,
-        onListeningStateChange: (Boolean) -> Unit
+        onListeningStateChange: (Boolean) -> Unit,
+        onPartialResult: (String) -> Unit
     ) {
         stop() // Use our new stop function to ensure TTS is stopped before listening
         speechMutex.withLock {
@@ -185,7 +186,8 @@ class SpeechCoordinator private constructor(private val context: Context) {
                     onListeningStateChange = { listening ->
                         isListening = listening
                         onListeningStateChange(listening)
-                    }
+                    },
+                    onPartialResult = { partialText -> onPartialResult(partialText) }
                 )
 
             } catch (e: Exception) {

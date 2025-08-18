@@ -19,6 +19,7 @@ class STTManager(private val context: Context) {
     private var onResultCallback: ((String) -> Unit)? = null
     private var onErrorCallback: ((String) -> Unit)? = null
     private var onListeningStateChange: ((Boolean) -> Unit)? = null
+    private var onPartialResultCallback: ((String) -> Unit)? = null
     private var isInitialized = false
     private val visualizerManager = STTVisualizer(context)
 
@@ -69,6 +70,7 @@ class STTManager(private val context: Context) {
                 Log.d("STTManager", "End of speech")
                 isListening = false
                 onListeningStateChange?.invoke(false)
+                onPartialResultCallback = null
             }
             
             override fun onError(error: Int) {
@@ -91,6 +93,7 @@ class STTManager(private val context: Context) {
                 
                 Log.e("STTManager", "Speech recognition error: $errorMessage")
                 onErrorCallback?.invoke(errorMessage)
+                onPartialResultCallback = null
             }
             
             override fun onResults(results: Bundle?) {
@@ -108,9 +111,15 @@ class STTManager(private val context: Context) {
                     onErrorCallback?.invoke("No speech detected")
                 }
             }
-            
+
             override fun onPartialResults(partialResults: Bundle?) {
-                // Optional: Can be used for real-time feedback
+                // v-- IMPLEMENT THIS METHOD --v
+                val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                if (!matches.isNullOrEmpty()) {
+                    val partialText = matches[0]
+                    Log.d("STTManager", "Partial result: $partialText")
+                    onPartialResultCallback?.invoke(partialText)
+                }
             }
             
             override fun onEvent(eventType: Int, params: Bundle?) {
@@ -123,6 +132,7 @@ class STTManager(private val context: Context) {
         onResult: (String) -> Unit,
         onError: (String) -> Unit,
         onListeningStateChange: (Boolean) -> Unit,
+        onPartialResult: (String) -> Unit
     ) {
         if (isListening) {
             Log.w("STTManager", "Already listening")
@@ -132,7 +142,7 @@ class STTManager(private val context: Context) {
         this.onResultCallback = onResult
         this.onErrorCallback = onError
         this.onListeningStateChange = onListeningStateChange
-
+        this.onPartialResultCallback = onPartialResult
 
         // Initialize on main thread if needed
         CoroutineScope(Dispatchers.Main).launch {

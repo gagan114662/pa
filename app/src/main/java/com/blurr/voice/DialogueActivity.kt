@@ -161,6 +161,13 @@ class DialogueActivity : AppCompatActivity() {
                     voiceInputButton.isPressed = isListening
                     voiceStatusText.text = if (isListening) getString(R.string.listening) else getString(R.string.hold_to_speak)
                 }
+            },
+            // ADD THIS CALLBACK
+            onPartialResult = { partialText ->
+                runOnUiThread {
+                    answerInput.setText(partialText)
+                    answerInput.setSelection(partialText.length) // Keep cursor at the end
+                }
             }
         )
     }

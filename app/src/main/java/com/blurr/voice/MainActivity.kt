@@ -273,6 +273,12 @@ class MainActivity : AppCompatActivity() {
                     voiceInputButton.isPressed = isListening
                     voiceStatusText.text = if (isListening) getString(R.string.listening) else getString(R.string.hold_to_speak)
                 }
+            },
+            onPartialResult = { partialText ->
+                runOnUiThread {
+                    inputField.setText(partialText)
+                    inputField.setSelection(partialText.length) // Keep cursor at the end
+                }
             }
         )
     }

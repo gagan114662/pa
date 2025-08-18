@@ -88,7 +88,7 @@ class Finger(private val context: Context) {
     }
 
     /**
-     * Types text into the focused input field. This is now much more efficient.
+     * Types text i)nto the focused input field. This is now much more efficient.
      */
     @RequiresApi(Build.VERSION_CODES.R)
     fun type(text: String) {

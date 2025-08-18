@@ -97,7 +97,9 @@ class UserInputManager(private val context: Context) {
                                                 },
                                                 onListeningStateChange = { isListening ->
                                                     Log.d(TAG, "Listening state changed on attempt $attempt: $isListening")
-                                                }
+                                                },
+                                                onPartialResult = { } // <-- FIX: Added the missing fourth argument
+
                                             )
                                         } ?: run {
                                             Log.w(TAG, "Speech recognition timed out on attempt $attempt")
