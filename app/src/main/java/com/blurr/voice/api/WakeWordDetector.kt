@@ -67,7 +67,9 @@ class WakeWordDetector(
                 Log.e("WakeWordDetector", "STT Error: $errorMessage")
                 restartListening()
             },
-            onListeningStateChange = { }
+            onListeningStateChange = { },
+            onPartialResult = { }
+
         )
 
         // Unmute the stream shortly after starting to ensure other notifications can be heard
