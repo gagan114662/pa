@@ -77,7 +77,7 @@ suspend fun getReasoningModelApiResponse(
 ): String? { // Return nullable String
     // Network check to avoid unnecessary API calls
     val isOnline = try {
-        NetworkConnectivityManager(MyApplication.appContext).isNetworkAvailable()
+        true
     } catch (e: Exception) {
         false
     }

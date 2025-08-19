@@ -34,7 +34,7 @@ object EmbeddingService {
     ): List<Float>? {
         // Network check
         try {
-            val isOnline = NetworkConnectivityManager(MyApplication.appContext).isNetworkAvailable()
+            val isOnline = true
             if (!isOnline) {
                 Log.e("EmbeddingService", "No internet connection. Skipping embedding call.")
                 NetworkNotifier.notifyOffline()

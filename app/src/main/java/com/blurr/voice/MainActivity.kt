@@ -89,6 +89,7 @@ class MainActivity : AppCompatActivity() {
 
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        handleIntent(intent)
 
         // One-time onboarding for name and email
         val profileManager = UserProfileManager(this)
@@ -217,6 +218,31 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
+    }
+    // --- ADD THIS FUNCTION TO PROCESS THE INTENT ---
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.action == "com.blurr.voice.WAKE_UP_PANDA") {
+            Log.d("MainActivity", "Wake up Panda shortcut activated!")
+
+            // Your logic from the prompt: Start a service that creates an overlay.
+            // You already have a service that does something similar: ConversationalAgentService
+            // We can start that directly.
+            if (!ConversationalAgentService.isRunning) {
+                val serviceIntent = Intent(this, ConversationalAgentService::class.java)
+                ContextCompat.startForegroundService(this, serviceIntent)
+                Toast.makeText(this, "Panda is waking up...", Toast.LENGTH_SHORT).show()
+            } else {
+                Log.d("MainActivity", "ConversationalAgentService is already running.")
+                Toast.makeText(this, "Panda is already awake!", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // --- ADD onNewIntent TO HANDLE THE SHORTCUT WHEN THE APP IS ALREADY OPEN ---
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
     }
 
 
