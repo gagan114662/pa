@@ -19,6 +19,8 @@
     <string name="screenshot_mode_description">Uses actual screenshots (more accurate, higher resource usage)</string>
     <string name="voice_input">Voice Command</string>
     <string name="hold_to_speak">Hold to Speak Command</string>
+    <string name="shortcut_wake_up_short">Wake up Panda</string>
+    <string name="shortcut_wake_up_long">Start a new conversation with Panda</string>
     <string name="listening">Listening...</string>
     <string name="speech_error">Speech recognition error</string>
     <string name="no_speech_detected">No speech detected</string>

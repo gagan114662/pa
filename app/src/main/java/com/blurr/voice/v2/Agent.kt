@@ -48,7 +48,7 @@ class Agent(
      * @param initialTask The high-level task requested by the user.
      * @param maxSteps The maximum number of steps the agent can take before stopping.
      */
-    suspend fun run(initialTask: String, maxSteps: Int = 20) {
+    suspend fun run(initialTask: String, maxSteps: Int = 40) {
         // Initialize the agent with the first task.
         memoryManager.addNewTask(initialTask)
         state.stopped = false

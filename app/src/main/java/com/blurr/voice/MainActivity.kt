@@ -41,35 +41,230 @@ import androidx.core.graphics.toColorInt
 
 class MainActivity : AppCompatActivity() {
 
-          private lateinit var statusText: TextView
-          private lateinit var inputField: EditText
-          private lateinit var contentModerationInputField: EditText
-          private lateinit var performTaskButton: TextView
-          private lateinit var contentModerationButton: TextView
-          private lateinit var handler: Handler
-    // private lateinit var grantPermission: Button // REMOVED
-    private lateinit var managePermissionsButton: TextView // ADDED
-          private lateinit var tvPermissionStatus: TextView
-          private lateinit var voiceInputButton: ImageButton
-          private lateinit var voiceStatusText: TextView
-          private lateinit var settingsButton: ImageButton
+    private lateinit var statusText: TextView
+    private lateinit var inputField: EditText
+    private lateinit var contentModerationInputField: EditText
+    private lateinit var performTaskButton: TextView
+    private lateinit var contentModerationButton: TextView
+    private lateinit var handler: Handler
+    private lateinit var managePermissionsButton: TextView
+    private lateinit var tvPermissionStatus: TextView
+    private lateinit var voiceInputButton: ImageButton
+    private lateinit var voiceStatusText: TextView
+    private lateinit var settingsButton: ImageButton
 
-          private lateinit var ttsManager: TTSManager
-          private lateinit var sttManager: STTManager
-          private lateinit var deepSearchAgent: DeepSearch
-          private lateinit var clarificationAgent: ClarificationAgent
-          private lateinit var userId: String
-          private lateinit var permissionManager: PermissionManager
-          private lateinit var conversationalAgentButton: TextView
+    private lateinit var ttsManager: TTSManager
+    private lateinit var sttManager: STTManager
+    private lateinit var deepSearchAgent: DeepSearch
+    private lateinit var clarificationAgent: ClarificationAgent
+    private lateinit var userId: String
+    private lateinit var permissionManager: PermissionManager
+    private lateinit var conversationalAgentButton: TextView
 
-          private val requestPermissionLauncher =
-                registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
-                          if (isGranted) {
-                                    Toast.makeText(this, "Microphone permission granted!", Toast.LENGTH_SHORT).show()
-                              } else {
-                                    Toast.makeText(this, "Permission denied.", Toast.LENGTH_SHORT).show()
-                              }
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+            if (isGranted) {
+                Toast.makeText(this, "Microphone permission granted!", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Permission denied.", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+    private val dialogueLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val enhancedInstruction = result.data?.getStringExtra(DialogueActivity.EXTRA_ENHANCED_INSTRUCTION)
+            if (!enhancedInstruction.isNullOrEmpty()) {
+                executeTask(enhancedInstruction)
+            }
+        } else if (result.resultCode == RESULT_CANCELED) {
+            Toast.makeText(this, "Dialogue cancelled", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.R)
+    override fun onCreate(savedInstanceState: Bundle?) {
+
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+        handleIntent(intent)
+
+        // One-time onboarding for name and email
+        val profileManager = UserProfileManager(this)
+        if (!profileManager.isProfileComplete()) {
+            startActivity(Intent(this, OnboardingActivity::class.java))
+        }
+        val userIdManager = UserIdManager(applicationContext)
+        userId = userIdManager.getOrCreateUserId()
+        println(userId)
+        askForNotificationPermission()
+        checkAndRequestOverlayPermission()
+        permissionManager = PermissionManager(this)
+        permissionManager.initializePermissionLauncher()
+        permissionManager.requestAllPermissions()
+
+        grantPermission = findViewById(R.id.btn_request_permission)
+        tvPermissionStatus = findViewById(R.id.tv_permission_status)
+        inputField = findViewById(R.id.inputField)
+        contentModerationInputField = findViewById(R.id.contentMoniterInputField)
+        performTaskButton = findViewById(R.id.performTaskButton)
+        contentModerationButton = findViewById(R.id.contentMoniterButton)
+        statusText = findViewById(R.id.tv_service_status)
+        voiceInputButton = findViewById(R.id.voiceInputButton)
+        voiceStatusText = findViewById(R.id.voiceStatusText)
+
+        conversationalAgentButton = findViewById(R.id.conversationalAgentButton)
+        settingsButton = findViewById(R.id.settingsButton)
+
+        grantPermission.setOnClickListener {
+            permissionManager.openAccessibilitySettings()
+        }
+
+        ttsManager = TTSManager.getInstance(this)
+        sttManager = STTManager(this)
+        deepSearchAgent = DeepSearch()
+        clarificationAgent = ClarificationAgent()
+
+        setupClickListeners()
+        setupVoiceInput()
+        setupSettingsButton()
+
+        handler = Handler(Looper.getMainLooper())
+
+        val karanTextView = findViewById<TextView>(R.id.karan_textview_gradient)
+        karanTextView.measure(0, 0)
+        val textShader: Shader = LinearGradient(
+            0f, 0f, karanTextView.measuredWidth.toFloat(), 0f,
+            intArrayOf("#BE63F3".toColorInt(), "#5880F7".toColorInt()),
+            null, Shader.TileMode.CLAMP
+        )
+        karanTextView.paint.shader = textShader
+        permissionManager.checkAndRequestOverlayPermission()
+        val githubLink = findViewById<TextView>(R.id.github_link_textview)
+        githubLink.setOnClickListener {
+            val url = "https://github.com/Ayush0Chaudhary/blurr"
+            val intent = Intent(Intent.ACTION_VIEW)
+            intent.data = url.toUri()
+            startActivity(intent)
+        }
+    }
+
+    @SuppressLint("SetTextI18n")
+    @RequiresApi(Build.VERSION_CODES.R)
+    private fun setupClickListeners() {
+        performTaskButton.setOnClickListener {
+            if (!isAccessibilityServiceEnabled()) {
+                Toast.makeText(this, "Accessibility permission is required to perform this task.", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+            val instruction = inputField.text.toString().trim()
+            if (instruction.isBlank()) {
+                Toast.makeText(this, "Please enter an instruction", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            statusText.text = "Thinking..."
+            performTaskButton.isEnabled = false
+
+            lifecycleScope.launch {
+                try {
+                    val needsClarification = checkIfClarificationNeeded(instruction)
+                    if (needsClarification.first) {
+                        startClarificationDialogue(instruction, needsClarification.second)
+                    } else {
+                        executeTask(instruction)
                     }
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Error processing instruction", e)
+                    val errorMessage = "Error processing your instruction: ${e.message}"
+                    statusText.text = errorMessage
+                    ttsManager.speakText(errorMessage)
+                } finally {
+                    performTaskButton.isEnabled = true
+                }
+            }
+        }
+
+        contentModerationButton.setOnClickListener {
+            if (!isAccessibilityServiceEnabled()) {
+                Toast.makeText(this, "Accessibility permission is required for content filtering.", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+            lifecycleScope.launch {
+                val instruction = contentModerationInputField.text.toString()
+                if (instruction.isBlank()) {
+                    Toast.makeText(this@MainActivity, "Please enter an instruction", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+
+                val fin = Finger(this@MainActivity)
+                fin.home()
+                delay(1500)
+
+                Log.d("MainActivity", "Starting ContentModerationService after delay.")
+                val serviceIntent = Intent(this@MainActivity, ContentModerationService::class.java).apply {
+                    putExtra("MODERATION_INSTRUCTION", instruction)
+                }
+                startService(serviceIntent)
+                Toast.makeText(this@MainActivity, "Content Moderation Started", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // Add memories button click listener
+        val memoriesButton = findViewById<TextView>(R.id.memoriesButton)
+        memoriesButton.setOnClickListener {
+            val intent = Intent(this, MemoriesActivity::class.java)
+            startActivity(intent)
+        }
+
+    }
+    // --- ADD THIS FUNCTION TO PROCESS THE INTENT ---
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.action == "com.blurr.voice.WAKE_UP_PANDA") {
+            Log.d("MainActivity", "Wake up Panda shortcut activated!")
+
+            // Your logic from the prompt: Start a service that creates an overlay.
+            // You already have a service that does something similar: ConversationalAgentService
+            // We can start that directly.
+            if (!ConversationalAgentService.isRunning) {
+                val serviceIntent = Intent(this, ConversationalAgentService::class.java)
+                ContextCompat.startForegroundService(this, serviceIntent)
+                Toast.makeText(this, "Panda is waking up...", Toast.LENGTH_SHORT).show()
+            } else {
+                Log.d("MainActivity", "ConversationalAgentService is already running.")
+                Toast.makeText(this, "Panda is already awake!", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // --- ADD onNewIntent TO HANDLE THE SHORTCUT WHEN THE APP IS ALREADY OPEN ---
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupVoiceInput() {
+        voiceInputButton.setOnTouchListener { _, event ->
+            if (!permissionManager.isMicrophonePermissionGranted()) {
+                permissionManager.requestMicrophonePermission()
+            }
+            when (event.action) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    startVoiceInput()
+                    true
+                }
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    stopVoiceInput()
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
 
           private val dialogueLauncher = registerForActivityResult(
                     ActivityResultContracts.StartActivityForResult()

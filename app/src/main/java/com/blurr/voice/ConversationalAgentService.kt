@@ -35,6 +35,7 @@ import com.blurr.voice.utilities.getReasoningModelApiResponse
 import com.blurr.voice.data.MemoryManager
 import com.blurr.voice.data.MemoryExtractor
 import com.blurr.voice.utilities.UserProfileManager
+import com.blurr.voice.utilities.VisualFeedbackManager
 import com.blurr.voice.v2.AgentService
 import com.google.ai.client.generativeai.type.TextPart
 import kotlinx.coroutines.CoroutineScope
@@ -60,6 +61,7 @@ class ConversationalAgentService : Service() {
     private val ttsManager by lazy { TTSManager.getInstance(this) }
     private val clarificationQuestionViews = mutableListOf<View>()
     private var transcriptionView: TextView? = null
+    private val visualFeedbackManager by lazy { VisualFeedbackManager.getInstance(this) }
 
     // Add these at the top of your ConversationalAgentService class
     private var clarificationAttempts = 0
@@ -90,6 +92,8 @@ class ConversationalAgentService : Service() {
         clarificationAttempts = 0 // Reset clarification attempts counter
         sttErrorAttempts = 0 // Reset STT error attempts counter
         usedMemories.clear() // Clear used memories for new conversation
+        visualFeedbackManager.showTtsWave()
+
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -114,22 +118,21 @@ class ConversationalAgentService : Service() {
         try {
             val userProfile = UserProfileManager(this@ConversationalAgentService)
             Log.d("ConvAgent", "No name found in memories, using generic greeting")
-            return "How can I help ${userProfile.getName()}?"
+            return "Hey ${userProfile.getName()}!"
         } catch (e: Exception) {
             Log.e("ConvAgent", "Error getting personalized greeting", e)
-            return "How can I help?"
+            return "Hey!"
         }
     }
 
+
+    // REPLACE the entire speakAndThenListen method with this refactored version
     @RequiresApi(Build.VERSION_CODES.O)
     private suspend fun speakAndThenListen(text: String, draw: Boolean = true) {
-        // Update system prompt with relevant memories before processing
         updateSystemPromptWithMemories()
         if (draw) {
-            Log.d("ConvAgent", "Displaying agent utterance: $text. Setting captions to true.")
             ttsManager.setCaptionsEnabled(true)
         } else {
-            Log.d("ConvAgent", "Not displaying agent utterance: $text. Setting captions to false.")
             ttsManager.setCaptionsEnabled(false)
         }
         speechCoordinator.speakText(text)
@@ -138,49 +141,32 @@ class ConversationalAgentService : Service() {
         speechCoordinator.startListening(
             onResult = { recognizedText ->
                 Log.d("ConvAgent", "Final user transcription: $recognizedText")
-                mainHandler.post {
-                    // 1. Show the final result in the transcription view
-                    updateTranscriptionView(recognizedText)
-                    // 2. Schedule the view to be hidden after 500ms
-                    mainHandler.postDelayed({
-                        hideTranscriptionView()
-                    }, 500)
-                }
-                // 3. Start processing the user's request immediately
+                visualFeedbackManager.updateTranscription(recognizedText)
+                mainHandler.postDelayed({
+                    visualFeedbackManager.hideTranscription()
+                }, 500)
                 processUserInput(recognizedText)
             },
             onError = { error ->
                 Log.e("ConvAgent", "STT Error: $error")
-                // On error, hide the transcription view immediately
-                mainHandler.post {
-                    hideTranscriptionView()
-                }
+                visualFeedbackManager.hideTranscription()
                 sttErrorAttempts++
-
                 serviceScope.launch {
                     if (sttErrorAttempts >= maxSttErrorAttempts) {
-                        Log.d("ConvAgent", "Max STT error attempts reached ($maxSttErrorAttempts). Ending conversation gracefully.")
                         val exitMessage = "I'm having trouble understanding you clearly. Please try calling later!"
                         gracefulShutdown(exitMessage)
                     } else {
-                        Log.d("ConvAgent", "STT error attempt $sttErrorAttempts/$maxSttErrorAttempts")
                         speakAndThenListen("I'm sorry, I didn't catch that. Could you please repeat?")
                     }
                 }
             },
             onPartialResult = { partialText ->
-                mainHandler.post {
-                    updateTranscriptionView(partialText)
-                }
+                visualFeedbackManager.updateTranscription(partialText)
             },
             onListeningStateChange = { listening ->
                 Log.d("ConvAgent", "Listening state: $listening")
-                mainHandler.post {
-                    if (listening) {
-                        showTranscriptionView()
-                    }
-                    // IMPORTANT: We no longer hide the view here.
-                    // Hiding is now controlled by onResult and onError to allow for the delay.
+                if (listening) {
+                    visualFeedbackManager.showTranscription()
                 }
             }
         )
@@ -662,6 +648,10 @@ class ConversationalAgentService : Service() {
         serviceScope.cancel()
         ttsManager.setCaptionsEnabled(false)
         isRunning = false
+        // USE the new manager to hide the wave and transcription view
+        visualFeedbackManager.hideTtsWave()
+        visualFeedbackManager.hideTranscription()
+
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

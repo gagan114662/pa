@@ -33,7 +33,7 @@ class MemoryService {
         }
         // Network check
         try {
-            val isOnline = NetworkConnectivityManager(MyApplication.appContext).isNetworkAvailable()
+            val isOnline = true
             if (!isOnline) {
                 Log.e("MemoryService", "No internet connection. Skipping addMemory call.")
                 NetworkNotifier.notifyOffline()
@@ -90,7 +90,7 @@ class MemoryService {
         }
         // Network check
         try {
-            val isOnline = NetworkConnectivityManager(MyApplication.appContext).isNetworkAvailable()
+            val isOnline = true
             if (!isOnline) {
                 Log.e("MemoryService", "No internet connection. Skipping searchMemory call.")
                 NetworkNotifier.notifyOffline()
