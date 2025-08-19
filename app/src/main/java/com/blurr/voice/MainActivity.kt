@@ -63,15 +63,17 @@ class MainActivity : AppCompatActivity() {
         if (!profileManager.isProfileComplete()) {
             startActivity(Intent(this, OnboardingActivity::class.java))
         }
+        managePermissionsButton = findViewById(R.id.btn_manage_permissions) // ADDED
+
         val userIdManager = UserIdManager(applicationContext)
         userId = userIdManager.getOrCreateUserId()
 
         permissionManager = PermissionManager(this)
         permissionManager.initializePermissionLauncher()
         permissionManager.requestAllPermissions()
-
         // Initialize UI components
         managePermissionsButton = findViewById(R.id.btn_manage_permissions)
+
         tvPermissionStatus = findViewById(R.id.tv_permission_status)
         settingsButton = findViewById(R.id.settingsButton)
         wakeWordButton = findViewById(R.id.wakeWordButton)
@@ -79,6 +81,7 @@ class MainActivity : AppCompatActivity() {
         // Initialize managers
         wakeWordManager = WakeWordManager(this, requestPermissionLauncher)
         handler = Handler(Looper.getMainLooper())
+
 
         // Setup UI and listeners
         setupClickListeners()
@@ -110,7 +113,6 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.memoriesButton).setOnClickListener {
             startActivity(Intent(this, MemoriesActivity::class.java))
         }
-
         wakeWordButton.setOnClickListener {
             wakeWordManager.handleWakeWordButtonClick(wakeWordButton)
             // Give the service a moment to update its state before refreshing the UI
@@ -162,4 +164,5 @@ class MainActivity : AppCompatActivity() {
         }
         wakeWordManager.updateButtonState(wakeWordButton)
     }
+
 }

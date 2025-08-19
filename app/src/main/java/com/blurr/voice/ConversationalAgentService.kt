@@ -82,6 +82,7 @@ class ConversationalAgentService : Service() {
         var isRunning = false
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate() {
         super.onCreate()
         Log.d("ConvAgent", "Service onCreate")
@@ -93,6 +94,10 @@ class ConversationalAgentService : Service() {
         sttErrorAttempts = 0 // Reset STT error attempts counter
         usedMemories.clear() // Clear used memories for new conversation
         visualFeedbackManager.showTtsWave()
+        visualFeedbackManager.showInputBox { submittedText ->
+            // This is the callback for when text is submitted
+            processUserInput(submittedText)
+        }
 
     }
 
@@ -126,15 +131,11 @@ class ConversationalAgentService : Service() {
     }
 
 
-    // REPLACE the entire speakAndThenListen method with this refactored version
     @RequiresApi(Build.VERSION_CODES.O)
     private suspend fun speakAndThenListen(text: String, draw: Boolean = true) {
         updateSystemPromptWithMemories()
-        if (draw) {
-            ttsManager.setCaptionsEnabled(true)
-        } else {
-            ttsManager.setCaptionsEnabled(false)
-        }
+        ttsManager.setCaptionsEnabled(draw)
+
         speechCoordinator.speakText(text)
         Log.d("ConvAgent", "Panda said: $text")
 
@@ -146,6 +147,8 @@ class ConversationalAgentService : Service() {
                     visualFeedbackManager.hideTranscription()
                 }, 500)
                 processUserInput(recognizedText)
+                visualFeedbackManager.hideInputBox()
+
             },
             onError = { error ->
                 Log.e("ConvAgent", "STT Error: $error")
@@ -651,7 +654,7 @@ class ConversationalAgentService : Service() {
         // USE the new manager to hide the wave and transcription view
         visualFeedbackManager.hideTtsWave()
         visualFeedbackManager.hideTranscription()
-
+        visualFeedbackManager.hideInputBox()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
