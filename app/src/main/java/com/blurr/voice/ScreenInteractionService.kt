@@ -86,7 +86,7 @@ class ScreenInteractionService : AccessibilityService() {
         this.windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         Log.d("InteractionService", "Accessibility Service connected.")
 //        setupGlowEffect()
-        setupAudioWaveEffect()
+//        setupAudioWaveEffect()
 //        setupWaveBorderEffect()
     }
     /**
@@ -879,7 +879,7 @@ class ScreenInteractionService : AccessibilityService() {
     /**
      * Connects the TTS audio output to the wave view for real-time visualization.
      */
-    private fun setupAudioWaveEffect() {
+    fun showAndSetupAudioWave() {
         showAudioWave()
         val ttsManager = TTSManager.getInstance(this)
         val audioSessionId = ttsManager.getAudioSessionId()
@@ -909,6 +909,24 @@ class ScreenInteractionService : AccessibilityService() {
             }
         }
     }
+    fun hideAudioWave() {
+        Handler(Looper.getMainLooper()).post {
+            audioWaveView?.let {
+                if (it.isAttachedToWindow) {
+                    windowManager?.removeView(it)
+                    Log.d("InteractionService", "Audio wave view removed.")
+                }
+            }
+            audioWaveView = null
+
+            // Clean up visualizer and listener to prevent leaks
+            ttsVisualizer?.stop()
+            ttsVisualizer = null
+            TTSManager.getInstance(this).utteranceListener = null
+            Log.d("InteractionService", "Audio wave effect has been torn down.")
+        }
+    }
+
 
 }
 

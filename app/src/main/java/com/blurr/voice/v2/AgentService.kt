@@ -14,6 +14,7 @@ import androidx.core.app.NotificationCompat
 import com.blurr.voice.api.ApiKeyManager
 import com.blurr.voice.api.Eyes
 import com.blurr.voice.api.Finger
+import com.blurr.voice.utilities.VisualFeedbackManager
 import com.blurr.voice.v2.actions.ActionExecutor
 import com.blurr.voice.v2.fs.FileSystem
 import com.blurr.voice.v2.llm.GeminiApi
@@ -40,6 +41,7 @@ class AgentService : Service() {
     // A dedicated coroutine scope tied to the service's lifecycle.
     // Using a SupervisorJob ensures that if one child coroutine fails, it doesn't cancel the whole scope.
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val visualFeedbackManager by lazy { VisualFeedbackManager.getInstance(this) }
 
     // Declare agent and its dependencies. They will be initialized in onCreate.
     private lateinit var agent: Agent
@@ -74,6 +76,7 @@ class AgentService : Service() {
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "onCreate: Service is being created.")
+        visualFeedbackManager.showTtsWave()
 
         // Create the notification channel required for foreground services on Android 8.0+
         createNotificationChannel()
@@ -145,6 +148,8 @@ class AgentService : Service() {
         Log.d(TAG, "onDestroy: Service is being destroyed.")
         // Cancel the coroutine scope to clean up the agent's running job and prevent leaks.
         serviceScope.cancel()
+        visualFeedbackManager.hideTtsWave()
+
     }
 
     /**
