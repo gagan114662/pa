@@ -220,14 +220,19 @@
             android:textColor="@android:color/holo_red_dark" />
 
 
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/btn_request_permission"
+        <TextView
+            android:id="@+id/btn_manage_permissions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:background="@drawable/btn_with_border"
-            android:text="@string/grant_accessibility_permission"
-            android:textColor="@android:color/white" />
+            android:background="@drawable/rounded_button"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:padding="12dp"
+            android:text="Manage Permissions"
+            android:textColor="@android:color/white"
+            android:textSize="16sp" />
     </LinearLayout>
     <View
         android:id="@+id/divider"
