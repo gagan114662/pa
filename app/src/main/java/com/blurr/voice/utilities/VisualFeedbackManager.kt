@@ -8,10 +8,16 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.Gravity
+import android.view.LayoutInflater
+import android.view.View
 import android.view.WindowManager
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
 import android.widget.TextView
 import androidx.core.graphics.toColorInt
 import com.blurr.voice.AudioWaveView
+import com.blurr.voice.R
 
 class VisualFeedbackManager private constructor(private val context: Context) {
 
@@ -22,6 +28,8 @@ class VisualFeedbackManager private constructor(private val context: Context) {
     private var audioWaveView: AudioWaveView? = null
     private var ttsVisualizer: TtsVisualizer? = null
     private var transcriptionView: TextView? = null
+    private var inputBoxView: View? = null
+
 
     companion object {
         private const val TAG = "VisualFeedbackManager"
@@ -170,6 +178,59 @@ class VisualFeedbackManager private constructor(private val context: Context) {
                 }
             }
             transcriptionView = null
+        }
+    }
+
+
+    // --- Input Box Methods ---
+    fun showInputBox(onSubmit: (String) -> Unit) {
+        mainHandler.post {
+            if (inputBoxView != null) return@post
+            val inflater = LayoutInflater.from(context)
+            inputBoxView = inflater.inflate(R.layout.overlay_input_box, null)
+            val inputField = inputBoxView?.findViewById<EditText>(R.id.overlayInputField)
+
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT
+            ).apply { gravity = Gravity.BOTTOM }
+
+            inputField?.setOnEditorActionListener { v, actionId, _ ->
+                if (actionId == EditorInfo.IME_ACTION_DONE) {
+                    val inputText = v.text.toString().trim()
+                    if (inputText.isNotEmpty()) {
+                        onSubmit(inputText)
+                        hideInputBox()
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
+
+            try {
+                windowManager.addView(inputBoxView, params)
+                inputField?.requestFocus()
+                val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                imm.showSoftInput(inputField, InputMethodManager.SHOW_IMPLICIT)
+            } catch (e: Exception) {
+                Log.e("VisualManager", "Error adding input box view", e)
+            }
+        }
+    }
+
+    fun hideInputBox() {
+        mainHandler.post {
+            inputBoxView?.let {
+                if (it.isAttachedToWindow) {
+                    val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                    imm.hideSoftInputFromWindow(it.windowToken, 0)
+                    windowManager.removeView(it)
+                }
+            }
+            inputBoxView = null
         }
     }
 }

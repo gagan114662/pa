@@ -24,6 +24,7 @@
     <string name="listening">Listening...</string>
     <string name="speech_error">Speech recognition error</string>
     <string name="no_speech_detected">No speech detected</string>
+    <string name="input_box_hint">+ Ask Panda</string>
     <string name="speech_permission_required">Microphone permission required for voice input</string>
     <string name="processing_voice_command">Processing voice command...</string>
     <string name="performing_task">I will perform the task: %s</string>
