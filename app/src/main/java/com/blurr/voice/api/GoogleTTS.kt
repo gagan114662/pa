@@ -79,7 +79,7 @@ object GoogleTts {
 
         // Network check
         val isOnline = try {
-            NetworkConnectivityManager(MyApplication.appContext).isNetworkAvailable()
+            true
         } catch (e: Exception) {
             Log.e("GoogleTts", "Network check failed, assuming offline. ${'$'}{e.message}")
             false

@@ -21,7 +21,7 @@ class TavilyApi(private val apiKey: String) {
         return withContext(Dispatchers.IO) {
             // Network check
             try {
-                val isOnline = NetworkConnectivityManager(MyApplication.appContext).isNetworkAvailable()
+                val isOnline = true
                 if (!isOnline) {
                     Log.e("TavilyApi", "No internet connection. Skipping search call.")
                     NetworkNotifier.notifyOffline()
