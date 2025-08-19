@@ -1,10 +1,8 @@
 package com.blurr.voice
 
-import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
@@ -12,15 +10,12 @@ import android.widget.NumberPicker
 import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
 import com.blurr.voice.agent.v1.VisionMode
 import com.blurr.voice.api.GoogleTts
 import com.blurr.voice.api.TTSVoice
-import com.blurr.voice.services.EnhancedWakeWordService
 import com.blurr.voice.utilities.SpeechCoordinator
 import com.blurr.voice.utilities.VoicePreferenceManager
 import com.blurr.voice.utilities.UserProfileManager
@@ -37,34 +32,19 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var backButton: Button
     private lateinit var permissionsInfoButton: TextView
     private lateinit var visionModeGroup: RadioGroup
-    private lateinit var wakeWordEngineGroup: RadioGroup
     private lateinit var visionModeDescription: TextView
-    private lateinit var wakeWordButton: Button
     private lateinit var editUserName: android.widget.EditText
     private lateinit var editUserEmail: android.widget.EditText
-    private lateinit var buttonSaveProfile: Button
 
     private lateinit var sc: SpeechCoordinator
     private lateinit var sharedPreferences: SharedPreferences
     private lateinit var availableVoices: List<TTSVoice>
     private var voiceTestJob: Job? = null
 
-    private val requestPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
-            if (isGranted) {
-                lifecycleScope.launch {
-                    startWakeWordService()
-                }
-            } else {
-                Toast.makeText(this, "Microphone permission is required for wake word.", Toast.LENGTH_LONG).show()
-            }
-        }
-
     companion object {
         private const val PREFS_NAME = "BlurrSettings"
         private const val KEY_SELECTED_VOICE = "selected_voice"
         private const val KEY_SELECTED_VISION_MODE = "selected_vision_mode"
-        private const val KEY_SELECTED_WAKE_WORD_ENGINE = "selected_wake_word_engine"
         private const val TEST_TEXT = "Hello, I'm Panda, and this is a test of the selected voice."
         private val DEFAULT_VOICE = TTSVoice.CHIRP_PUCK
     }
@@ -99,11 +79,8 @@ class SettingsActivity : AppCompatActivity() {
         permissionsInfoButton = findViewById(R.id.permissionsInfoButton)
         visionModeGroup = findViewById(R.id.visionModeGroup)
         visionModeDescription = findViewById(R.id.visionModeDescription)
-        wakeWordButton = findViewById(R.id.wakeWordButton)
-        wakeWordEngineGroup = findViewById(R.id.wakeWordEngineGroup)
         editUserName = findViewById(R.id.editUserName)
         editUserEmail = findViewById(R.id.editUserEmail)
-//        buttonSaveProfile = findViewById(R.id.buttonSaveProfile)
 
         setupClickListeners()
         setupVoicePicker()
@@ -130,33 +107,6 @@ class SettingsActivity : AppCompatActivity() {
             val intent = Intent(this, PermissionsActivity::class.java)
             startActivity(intent)
         }
-        wakeWordButton.setOnClickListener {
-            if (EnhancedWakeWordService.isRunning) {
-                stopService(Intent(this, EnhancedWakeWordService::class.java))
-                Toast.makeText(this, getString(R.string.wake_word_disabled), Toast.LENGTH_SHORT).show()
-                lifecycleScope.launch {
-                    updateUIState()
-                }
-            } else {
-                lifecycleScope.launch {
-                    startWakeWordService()
-                }
-            }
-        }
-
-//        buttonSaveProfile.setOnClickListener {
-//            val name = editUserName.text.toString().trim()
-//            val email = editUserEmail.text.toString().trim()
-//            // Both inputs are optional; validate email only if provided
-//            if (email.isNotEmpty() && !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-//                Toast.makeText(this, "Please enter a valid email or leave it blank", Toast.LENGTH_SHORT).show()
-//                return@setOnClickListener
-//            }
-//            val pm = UserProfileManager(this)
-//            pm.saveProfile(name, email)
-//            Toast.makeText(this, "Profile saved", Toast.LENGTH_SHORT).show()
-//        }
-
     }
 
     private fun setupAutoSavingListeners() {
@@ -187,14 +137,6 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
-        wakeWordEngineGroup.setOnCheckedChangeListener { _, checkedId ->
-            saveWakeWordEngine(checkedId)
-            val engineName = "Porcupine"
-            if (!isInitialLoad) {
-                Toast.makeText(this, "Wake Word Engine set to $engineName", Toast.LENGTH_SHORT).show()
-            }
-        }
-
         ttsVoicePicker.post {
             isInitialLoad = false
         }
@@ -207,13 +149,10 @@ class SettingsActivity : AppCompatActivity() {
 
             try {
                 if (voiceFile.exists()) {
-                    // ✅ If sample is cached, read the raw audio bytes
                     val audioData = voiceFile.readBytes()
-                    // Play the raw audio data directly
                     sc.playAudioData(audioData)
                     Log.d("SettingsActivity", "Playing cached sample for ${voice.displayName}")
                 } else {
-                    // ✅ If not cached, synthesize and play using the specific voice
                     sc.testVoice(TEST_TEXT, voice)
                     Log.d("SettingsActivity", "Synthesizing test for ${voice.displayName}")
                 }
@@ -252,24 +191,6 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
-    private suspend fun startWakeWordService() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            val serviceIntent = Intent(this, EnhancedWakeWordService::class.java).apply {
-                putExtra(EnhancedWakeWordService.EXTRA_USE_PORCUPINE, true) // Always use Porcupine
-            }
-            ContextCompat.startForegroundService(this, serviceIntent)
-            Toast.makeText(this, getString(R.string.wake_word_enabled, "Porcupine"), Toast.LENGTH_SHORT).show()
-            updateUIState()
-        } else {
-            requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-        }
-    }
-
-    private suspend fun updateUIState() {
-        delay(500)
-        wakeWordButton.text = if (EnhancedWakeWordService.isRunning) getString(R.string.wake_word_disabled) else getString(R.string.enable_wake_word)
-    }
-
     private fun loadAllSettings() {
         val savedVoiceName = sharedPreferences.getString(KEY_SELECTED_VOICE, DEFAULT_VOICE.name)
         val savedVoice = availableVoices.find { it.name == savedVoiceName } ?: DEFAULT_VOICE
@@ -277,9 +198,6 @@ class SettingsActivity : AppCompatActivity() {
 
         val savedVisionId = sharedPreferences.getInt(KEY_SELECTED_VISION_MODE, R.id.xmlModeRadio)
         visionModeGroup.check(savedVisionId)
-
-        val savedWakeWordId = sharedPreferences.getInt(KEY_SELECTED_WAKE_WORD_ENGINE, R.id.porcupineEngineRadio) // Assuming default is Porcupine
-        wakeWordEngineGroup.check(savedWakeWordId)
     }
 
     private fun saveSelectedVoice(voice: TTSVoice) {
@@ -287,17 +205,9 @@ class SettingsActivity : AppCompatActivity() {
         Log.d("SettingsActivity", "Saved voice: ${voice.displayName}")
     }
 
-
-
     private fun saveVisionMode(checkedId: Int) {
         sharedPreferences.edit {
             putInt(KEY_SELECTED_VISION_MODE, checkedId)
-        }
-    }
-
-    private fun saveWakeWordEngine(checkedId: Int) {
-        sharedPreferences.edit {
-            putInt(KEY_SELECTED_WAKE_WORD_ENGINE, checkedId)
         }
     }
 }

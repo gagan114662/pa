@@ -35,7 +35,7 @@
     <string name="cancel">Cancel</string>
     <string name="type_answer_here">Type your answer here…</string>
     <string name="or_use_voice_input">Or use voice input</string>
-    <string name="enable_wake_word">ENABLE WAKE WORD</string>
+    <string name="enable_wake_word">Enable Wake Word</string>
     <string name="wake_word_engine">Wake Word Engine</string>
     <string name="stt_engine">STT Engine</string>
     <string name="porcupine_engine">If there is too much demand, our wake word service might be down, in that case we will add button at the bottom left and you can use it to activate panda</string>
