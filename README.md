@@ -1,7 +1,7 @@
 # 🐼 Panda: Your Personal AI Phone Operator
 
 **You touch grass. I'll touch your glass.**
-
+[DISCORD INVITE](https://discord.gg/FhyfrZBq)
 ---
 
 ## Demos Panda Doing stuff for you
