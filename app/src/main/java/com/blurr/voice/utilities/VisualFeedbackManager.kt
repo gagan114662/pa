@@ -1,5 +1,6 @@
 package com.blurr.voice.utilities
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.PixelFormat
 import android.graphics.Typeface
@@ -9,13 +10,17 @@ import android.os.Looper
 import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.core.graphics.toColorInt
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.blurr.voice.AudioWaveView
 import com.blurr.voice.R
 
@@ -81,9 +86,11 @@ class VisualFeedbackManager private constructor(private val context: Context) {
             WindowManager.LayoutParams.MATCH_PARENT, heightInPixels,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT
+            PixelFormat.TRANSLUCENT,
+
         ).apply {
             gravity = Gravity.BOTTOM
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         }
         windowManager.addView(audioWaveView, params)
         Log.d(TAG, "Audio wave view added.")
@@ -147,6 +154,7 @@ class VisualFeedbackManager private constructor(private val context: Context) {
                 PixelFormat.TRANSLUCENT
             ).apply {
                 gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
                 y = 250 // Position it above the wave view
             }
 
@@ -182,26 +190,65 @@ class VisualFeedbackManager private constructor(private val context: Context) {
     }
 
 
-    // --- Input Box Methods ---
-    fun showInputBox(onSubmit: (String) -> Unit) {
+    @SuppressLint("ClickableViewAccessibility")
+    fun showInputBox(
+        onActivated: () -> Unit,
+        onSubmit: (String) -> Unit
+    ) {
         mainHandler.post {
-            if (inputBoxView != null) return@post
+            if (inputBoxView?.isAttachedToWindow == true) {
+                // If already showing, just ensure focus
+                inputBoxView?.findViewById<EditText>(R.id.overlayInputField)?.requestFocus()
+                val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                imm.showSoftInput(inputBoxView?.findViewById(R.id.overlayInputField), InputMethodManager.SHOW_IMPLICIT)
+                return@post
+            }
+
+            if (inputBoxView != null) {
+                try { windowManager.removeView(inputBoxView) } catch (e: Exception) {}
+            }
+
             val inflater = LayoutInflater.from(context)
             inputBoxView = inflater.inflate(R.layout.overlay_input_box, null)
+
             val inputField = inputBoxView?.findViewById<EditText>(R.id.overlayInputField)
+            val rootLayout = inputBoxView?.findViewById<View>(R.id.overlayRootLayout)
 
             val params = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                // You need it to be focusable to receive key events.
+                // The absence of FLAG_NOT_FOCUSABLE makes it focusable by default.
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
                 PixelFormat.TRANSLUCENT
-            ).apply { gravity = Gravity.BOTTOM }
+            ).apply {
+                gravity = Gravity.BOTTOM
+            }
+
+            ViewCompat.setOnApplyWindowInsetsListener(inputBoxView!!) { view, insets ->
+                val imeHeight = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+                val navigationBarHeight = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom
+
+                // The view's vertical position (y) should be the keyboard's height
+                // minus the navigation bar height, as the view is already avoiding the nav bar.
+                params.y = imeHeight - navigationBarHeight
+
+                // Apply the updated layout parameters
+                if (view.isAttachedToWindow) {
+                    windowManager.updateViewLayout(view, params)
+                }
+
+                WindowInsetsCompat.CONSUMED // Consume the insets
+            }
 
             inputField?.setOnEditorActionListener { v, actionId, _ ->
                 if (actionId == EditorInfo.IME_ACTION_DONE) {
                     val inputText = v.text.toString().trim()
                     if (inputText.isNotEmpty()) {
                         onSubmit(inputText)
+                        v.text = ""
+                    } else {
+                        // If empty, just hide the box
                         hideInputBox()
                     }
                     true
@@ -210,17 +257,32 @@ class VisualFeedbackManager private constructor(private val context: Context) {
                 }
             }
 
+            inputField?.setOnTouchListener { _, _ ->
+                onActivated()
+                false
+            }
+
+            rootLayout?.setOnTouchListener { _, event ->
+                if (event.action == MotionEvent.ACTION_OUTSIDE) {
+                    hideInputBox()
+                    return@setOnTouchListener true
+                }
+                false
+            }
+
             try {
                 windowManager.addView(inputBoxView, params)
+                // **IMPROVEMENT**: Explicitly request focus and show the keyboard
                 inputField?.requestFocus()
                 val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
                 imm.showSoftInput(inputField, InputMethodManager.SHOW_IMPLICIT)
+
             } catch (e: Exception) {
                 Log.e("VisualManager", "Error adding input box view", e)
             }
         }
     }
-
+    // --- REPLACE the hideInputBox method with this simplified version ---
     fun hideInputBox() {
         mainHandler.post {
             inputBoxView?.let {
