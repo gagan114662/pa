@@ -203,6 +203,10 @@ class SpeechCoordinator private constructor(private val context: Context) {
             isListening = false
         }
     }
+    fun stopSpeaking() {
+        ttsManager.stop()
+        Log.d("SpeechCoordinator", "Speaking explicitly stopped.")
+    }
 
 
     fun isCurrentlySpeaking(): Boolean = isSpeaking

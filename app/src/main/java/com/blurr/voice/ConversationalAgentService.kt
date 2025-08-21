@@ -62,6 +62,7 @@ class ConversationalAgentService : Service() {
     private val clarificationQuestionViews = mutableListOf<View>()
     private var transcriptionView: TextView? = null
     private val visualFeedbackManager by lazy { VisualFeedbackManager.getInstance(this) }
+    private var isTextModeActive = false
 
     // Add these at the top of your ConversationalAgentService class
     private var clarificationAttempts = 0
@@ -94,12 +95,41 @@ class ConversationalAgentService : Service() {
         sttErrorAttempts = 0 // Reset STT error attempts counter
         usedMemories.clear() // Clear used memories for new conversation
         visualFeedbackManager.showTtsWave()
-        visualFeedbackManager.showInputBox { submittedText ->
-            // This is the callback for when text is submitted
-            processUserInput(submittedText)
-        }
+        showInputBoxIfNeeded()
+
 
     }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun showInputBoxIfNeeded() {
+        // This function ensures the input box is always configured correctly
+        // whether it's the first time or a subsequent turn in text mode.
+        visualFeedbackManager.showInputBox(
+            onActivated = {
+                // This is called when the user taps the EditText
+                enterTextMode()
+            },
+            onSubmit = { submittedText ->
+                // This is the existing callback for when text is submitted
+                processUserInput(submittedText)
+            },
+        )
+    }
+
+    /**
+     * Call this when the user starts interacting with the text input.
+     * It stops any ongoing voice interaction.
+     */
+    private fun enterTextMode() {
+        if (isTextModeActive) return
+        Log.d("ConvAgent", "Entering Text Mode. Stopping STT/TTS.")
+        isTextModeActive = true
+        speechCoordinator.stopListening()
+        speechCoordinator.stopSpeaking()
+        // Optionally hide the transcription view since user is typing
+        visualFeedbackManager.hideTranscription()
+    }
+
 
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -138,20 +168,29 @@ class ConversationalAgentService : Service() {
 
         speechCoordinator.speakText(text)
         Log.d("ConvAgent", "Panda said: $text")
-
+        // --- CHANGE 4: Check if we are in text mode before starting to listen ---
+        if (isTextModeActive) {
+            Log.d("ConvAgent", "In text mode, ensuring input box is visible and skipping voice listening.")
+            // Post to main handler to ensure UI operations are on the main thread.
+            mainHandler.post {
+                showInputBoxIfNeeded() // Re-show the input box for the next turn.
+            }
+            return // IMPORTANT: Skip starting the voice listener entirely.
+        }
         speechCoordinator.startListening(
             onResult = { recognizedText ->
+                if (isTextModeActive) return@startListening // Ignore errors in text mode
                 Log.d("ConvAgent", "Final user transcription: $recognizedText")
                 visualFeedbackManager.updateTranscription(recognizedText)
                 mainHandler.postDelayed({
                     visualFeedbackManager.hideTranscription()
                 }, 500)
                 processUserInput(recognizedText)
-                visualFeedbackManager.hideInputBox()
 
             },
             onError = { error ->
                 Log.e("ConvAgent", "STT Error: $error")
+                if (isTextModeActive) return@startListening // Ignore errors in text mode
                 visualFeedbackManager.hideTranscription()
                 sttErrorAttempts++
                 serviceScope.launch {
@@ -164,11 +203,13 @@ class ConversationalAgentService : Service() {
                 }
             },
             onPartialResult = { partialText ->
+                if (isTextModeActive) return@startListening // Ignore errors in text mode
                 visualFeedbackManager.updateTranscription(partialText)
             },
             onListeningStateChange = { listening ->
                 Log.d("ConvAgent", "Listening state: $listening")
                 if (listening) {
+                    if (isTextModeActive) return@startListening // Ignore errors in text mode
                     visualFeedbackManager.showTranscription()
                 }
             }
@@ -306,7 +347,7 @@ class ConversationalAgentService : Service() {
 
             } catch (e: Exception) {
                 Log.e("ConvAgent", "Error processing user input: ${e.message}", e)
-                speakAndThenListen("I encountered an error. Let's try again.")
+                speakAndThenListen("closing voice mode")
             }
         }
     }
