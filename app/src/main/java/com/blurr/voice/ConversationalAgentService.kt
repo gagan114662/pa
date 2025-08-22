@@ -276,6 +276,8 @@ class ConversationalAgentService : Service() {
             transcriptionView = null
         }
     }
+
+
     // --- CHANGED: Rewritten to process the new custom text format ---
     @RequiresApi(Build.VERSION_CODES.O)
     private fun processUserInput(userInput: String) {
@@ -670,7 +672,9 @@ class ConversationalAgentService : Service() {
     }
 
     private suspend fun gracefulShutdown(exitMessage: String? = null) {
-            if (exitMessage != null) {
+        visualFeedbackManager.hideInputBox()
+
+        if (exitMessage != null) {
                 speechCoordinator.speakText(exitMessage)
                 delay(2000) // Give TTS time to finish
             }
@@ -679,7 +683,6 @@ class ConversationalAgentService : Service() {
                 Log.d("ConvAgent", "Extracting memories before shutdown.")
                 MemoryExtractor.extractAndStoreMemories(conversationHistory, memoryManager, usedMemories)
             }
-
             // 3. Stop the service
             stopSelf()
 
@@ -696,6 +699,7 @@ class ConversationalAgentService : Service() {
         visualFeedbackManager.hideTtsWave()
         visualFeedbackManager.hideTranscription()
         visualFeedbackManager.hideInputBox()
+
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

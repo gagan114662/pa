@@ -14,6 +14,7 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 
@@ -70,8 +71,9 @@ class PermissionsActivity : AppCompatActivity() {
     }
 
     private fun setupGrantButtonListeners() {
+        // --- CHANGED: The click listener now shows a consent dialog ---
         grantAccessibilityButton.setOnClickListener {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            showAccessibilityConsentDialog()
         }
 
         grantMicrophoneButton.setOnClickListener {
@@ -87,6 +89,27 @@ class PermissionsActivity : AppCompatActivity() {
                 startActivity(intent)
             }
         }
+    }
+
+    private fun showAccessibilityConsentDialog() {
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(getString(R.string.accessibility_consent_title))
+            .setMessage(getString(R.string.accessibility_consent_message))
+            .setPositiveButton(getString(R.string.accept)) { _, _ ->
+                // User clicked Accept, navigate to System Settings
+                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                startActivity(intent)
+            }
+            .setNegativeButton(getString(R.string.decline)) { dialog, _ ->
+                // User clicked Decline, just dismiss the dialog and do nothing
+                dialog.dismiss()
+            }
+            .create()
+
+        // Now, show the dialog
+        dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.WHITE)
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.parseColor("#F44336"))
     }
 
     private fun updatePermissionStatuses() {

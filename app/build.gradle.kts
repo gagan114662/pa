@@ -24,8 +24,8 @@ android {
         applicationId = "com.blurr.voice"
         minSdk = 24
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.0.2"
+        versionCode = 8
+        versionName = "1.0.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

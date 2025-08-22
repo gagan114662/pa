@@ -32,6 +32,18 @@
     <string name="clarification_needed">Clarification needed</string>
     <string name="dialogue_cancelled">Dialogue cancelled</string>
     <string name="submit_answer">Submit Answer</string>
+    <string name="accessibility_permission_details">
+    "<b>• See your screen:</b> When you activate Panda, it can view the content currently displayed on your screen to understand the context.\n\n"
+    "<b>• Interact with your screen:</b> This allows Panda to perform actions on your behalf, such as tapping buttons, scrolling through pages, and using navigation like the Back, Home, or Switch App buttons.\n\n"
+    "<b>• Screen Content &amp; Privacy:</b> Panda can see the screen. We are continuously working on guardrails to prevent it from viewing sensitive information, but these systems are not yet perfect. Please be mindful.\n\n"
+    "This service is incredibly helpful for enabling hands-free device control, especially for visually impaired users."
+    </string>
+    <string name="app_list_permission_title">App Management</string>
+    <string name="app_list_permission_desc">Allows Panda to see the apps you have installed. With this, Panda can open applications for you directly and instantly (e.g., "Open YouTube"), instead of relying on slower methods of searching the screen. This makes the process much faster and more reliable.</string>
+    <string name="accessibility_consent_title">Permission Confirmation</string>
+    <string name="accessibility_consent_message">To enable hands-free control, Panda requires Accessibility permission. This allows the app to:\n\n• <b>Read the content on your screen</b> to understand context.\n\n• <b>Perform actions for you</b> like tapping, scrolling, and navigating.\n\nPanda is designed to assist, especially visually impaired users, by enabling full voice control of the device.\n\nDo you want to proceed to Settings to enable this?</string>
+    <string name="accept">Accept</string>
+    <string name="decline">Decline</string>
     <string name="cancel">Cancel</string>
     <string name="type_answer_here">Type your answer here…</string>
     <string name="or_use_voice_input">Or use voice input</string>
