@@ -11,6 +11,8 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.blurr.voice.utilities.FreemiumManager
 import com.blurr.voice.utilities.UserProfileManager
 import com.google.android.gms.auth.api.identity.BeginSignInRequest
 import com.google.android.gms.auth.api.identity.Identity
@@ -20,6 +22,7 @@ import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.auth
+import kotlinx.coroutines.launch
 
 class LoginActivity : AppCompatActivity() {
 
@@ -133,9 +136,15 @@ class LoginActivity : AppCompatActivity() {
                         profileManager.saveProfile("Unknown", "unknown")
                         Log.w("LoginActivity", "User name or email was null, profile not saved.")
                     }
-                    Toast.makeText(this, "Welcome, ${user?.displayName}", Toast.LENGTH_SHORT).show()
-                    startActivity(Intent(this, MainActivity::class.java))
-                    finish()
+                    lifecycleScope.launch {
+                        val freemiumManager = FreemiumManager()
+                        freemiumManager.provisionUserIfNeeded()
+
+                        // Proceed to the next activity only after provisioning is attempted
+                        Toast.makeText(this@LoginActivity, "Welcome, ${user?.displayName}", Toast.LENGTH_SHORT).show()
+                        startActivity(Intent(this@LoginActivity, MainActivity::class.java))
+                        finish()
+                    }
                 } else {
                     Log.w("LoginActivity", "signInWithCredential:failure", task.exception)
                     Toast.makeText(this, "Authentication Failed.", Toast.LENGTH_SHORT).show()
