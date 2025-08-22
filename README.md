@@ -111,3 +111,7 @@ adb pull /data/data/com.example.blurr/files/gemini_logs/
 
 # View logs in real-time
 adb logcat | grep GeminiApi
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Ayush0Chaudhary/blurr&type=Timeline)](https://www.star-history.com/#Ayush0Chaudhary/blurr&Timeline)
