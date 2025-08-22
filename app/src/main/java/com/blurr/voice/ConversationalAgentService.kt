@@ -350,8 +350,13 @@ class ConversationalAgentService : Service() {
 
                                 gracefulShutdown(decision.reply)
                             }
+                        }else{
+                            Log.w("ConvAgent", "User has no tasks remaining. Denying request.")
+                            val upgradeMessage = "${getPersonalizedGreeting()} You've used all your free tasks for the month. Please upgrade in the app to unlock more. We can still talk in voice mode."
+                            conversationHistory = addResponse("model", upgradeMessage, conversationHistory)
+//                            gracefulShutdown(upgradeMessage)
+                            speakAndThenListen(upgradeMessage)
                         }
-
                     }
                     else -> { // Default to "Reply"
                         if (decision.shouldEnd) {
