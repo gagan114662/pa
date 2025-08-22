@@ -47,9 +47,9 @@
                 android:resource="@xml/shortcuts" />
         </activity>
         <activity
-            android:name=".OnboardingActivity"
+            android:name=".LoginActivity"
             android:exported="false"
-            android:label="Onboarding"
+            android:label="Login_activity"
             android:theme="@style/Theme.Blurr" />
         <activity
             android:name=".ChatActivity"

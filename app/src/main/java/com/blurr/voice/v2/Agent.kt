@@ -131,6 +131,7 @@ class Agent(
 
         // --- Loop Finished ---
         if (state.nSteps > maxSteps) {
+
             Log.d(TAG,"--- 🏁 Agent reached max steps. Stopping. ---")
         } else {
             Log.d(TAG,"--- 🏁 Agent run finished. ---")

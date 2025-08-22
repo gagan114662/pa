@@ -29,6 +29,11 @@ import com.blurr.voice.utilities.PermissionManager
 import com.blurr.voice.utilities.UserIdManager
 import com.blurr.voice.utilities.UserProfileManager
 import com.blurr.voice.utilities.WakeWordManager
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.firebase.Firebase
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.auth
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -41,6 +46,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var userId: String
     private lateinit var permissionManager: PermissionManager
     private lateinit var wakeWordManager: WakeWordManager
+    private lateinit var auth: FirebaseAuth
+
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
@@ -56,13 +63,23 @@ class MainActivity : AppCompatActivity() {
     @RequiresApi(Build.VERSION_CODES.R)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        auth = Firebase.auth
+        val currentUser = auth.currentUser
+        val profileManager = UserProfileManager(this)
+
+        // --- UNIFIED AUTHENTICATION & PROFILE CHECK ---
+        // We check both conditions at once. If the user is either not logged in
+        // OR their profile is incomplete, we send them to the LoginActivity.
+        if (currentUser == null || !profileManager.isProfileComplete()) {
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish() // Destroy MainActivity
+            return   // Stop executing any more code in this method
+        }
+
+
         setContentView(R.layout.activity_main)
         handleIntent(intent)
-
-        val profileManager = UserProfileManager(this)
-        if (!profileManager.isProfileComplete()) {
-            startActivity(Intent(this, OnboardingActivity::class.java))
-        }
         managePermissionsButton = findViewById(R.id.btn_manage_permissions) // ADDED
 
         val userIdManager = UserIdManager(applicationContext)
@@ -88,7 +105,25 @@ class MainActivity : AppCompatActivity() {
         setupSettingsButton()
         setupGradientText()
     }
-
+    override fun onStart() {
+        super.onStart()
+        // It's good practice to re-check authentication in onStart as well.
+        if (auth.currentUser == null) {
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish()
+        }
+    }
+//    private fun signOut() {
+//        auth.signOut()
+//        // Optional: Also sign out from the Google account on the device
+//        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
+//        val googleSignInClient = GoogleSignIn.getClient(this, gso)
+//        googleSignInClient.signOut().addOnCompleteListener {
+//            // After signing out, redirect to LoginActivity
+//            startActivity(Intent(this, LoginActivity::class.java))
+//            finish()
+//        }
+//    }
     private fun handleIntent(intent: Intent?) {
         if (intent?.action == "com.blurr.voice.WAKE_UP_PANDA") {
             Log.d("MainActivity", "Wake up Panda shortcut activated!")

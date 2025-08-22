@@ -8,6 +8,7 @@ plugins {
     id("com.google.gms.google-services")
     alias(libs.plugins.ksp)
     id("org.jetbrains.kotlin.plugin.serialization") version "2.2.10"
+
 }
 
 val localProperties = Properties()
@@ -137,13 +138,21 @@ dependencies {
     // Porcupine Wake Word Engine
     implementation("ai.picovoice:porcupine-android:3.0.2")
 
-    implementation(platform("com.google.firebase:firebase-bom:34.0.0"))
     implementation("com.google.firebase:firebase-analytics")
-// build.gradle.kts
-    implementation(libs.firebase.firestore)
-    
+
     // Room database dependencies
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
+    // Import the Firebase BoM
+    implementation(platform(libs.firebase.bom))
+
+    // Add the dependency for the Firebase Authentication library
+    implementation(libs.firebase.auth)
+
+    // Add the dependency for the Google Play services library
+    implementation(libs.play.services.auth)
+
+    implementation("com.google.firebase:firebase-analytics")
+    implementation(libs.firebase.firestore)
 }
