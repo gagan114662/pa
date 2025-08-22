@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.util.Log
+import android.view.View
 import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
@@ -25,6 +26,7 @@ import androidx.core.net.toUri
 import androidx.core.graphics.toColorInt
 import androidx.lifecycle.lifecycleScope
 import com.blurr.voice.services.EnhancedWakeWordService
+import com.blurr.voice.utilities.FreemiumManager
 import com.blurr.voice.utilities.PermissionManager
 import com.blurr.voice.utilities.UserIdManager
 import com.blurr.voice.utilities.UserProfileManager
@@ -47,6 +49,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var permissionManager: PermissionManager
     private lateinit var wakeWordManager: WakeWordManager
     private lateinit var auth: FirebaseAuth
+    private lateinit var tasksRemainingTextView: TextView
+    private lateinit var freemiumManager: FreemiumManager
 
 
     private val requestPermissionLauncher =
@@ -94,7 +98,8 @@ class MainActivity : AppCompatActivity() {
         tvPermissionStatus = findViewById(R.id.tv_permission_status)
         settingsButton = findViewById(R.id.settingsButton)
         wakeWordButton = findViewById(R.id.wakeWordButton)
-
+        tasksRemainingTextView = findViewById(R.id.tasks_remaining_textview)
+        freemiumManager = FreemiumManager()
         // Initialize managers
         wakeWordManager = WakeWordManager(this, requestPermissionLauncher)
         handler = Handler(Looper.getMainLooper())
@@ -184,9 +189,22 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        updateTaskCounter()
+
         updateUI()
     }
-
+    private fun updateTaskCounter() {
+        lifecycleScope.launch {
+            val tasksLeft = freemiumManager.getTasksRemaining()
+            if (tasksLeft != null && tasksLeft >= 0) {
+                tasksRemainingTextView.text = "You have $tasksLeft free tasks remaining."
+                tasksRemainingTextView.visibility = View.VISIBLE
+            } else {
+                // Hide the text view if there's an error or count is invalid
+                tasksRemainingTextView.visibility = View.GONE
+            }
+        }
+    }
     @SuppressLint("SetTextI18n")
     private fun updateUI() {
         val allPermissionsGranted = permissionManager.areAllPermissionsGranted()

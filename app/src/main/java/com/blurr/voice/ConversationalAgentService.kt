@@ -34,6 +34,7 @@ import com.blurr.voice.utilities.addResponse
 import com.blurr.voice.utilities.getReasoningModelApiResponse
 import com.blurr.voice.data.MemoryManager
 import com.blurr.voice.data.MemoryExtractor
+import com.blurr.voice.utilities.FreemiumManager
 import com.blurr.voice.utilities.UserProfileManager
 import com.blurr.voice.utilities.VisualFeedbackManager
 import com.blurr.voice.v2.AgentService
@@ -63,6 +64,7 @@ class ConversationalAgentService : Service() {
     private var transcriptionView: TextView? = null
     private val visualFeedbackManager by lazy { VisualFeedbackManager.getInstance(this) }
     private var isTextModeActive = false
+    private val freemiumManager by lazy { FreemiumManager() }
 
     // Add these at the top of your ConversationalAgentService class
     private var clarificationAttempts = 0
@@ -300,40 +302,55 @@ class ConversationalAgentService : Service() {
                         Log.d("ConvAgent", "Model identified a task. Checking for clarification...")
                         // --- NEW: Check if the task instruction needs clarification ---
                         removeClarificationQuestions()
+                        if(freemiumManager.canPerformTask()){
+                            Log.d("ConvAgent", "Allowance check passed. Proceeding with task.")
 
-                        if (clarificationAttempts < maxClarificationAttempts) {
-                            val (needsClarification, questions) = checkIfClarificationNeeded(decision.instruction)
-                            Log.d("ConcAgent", needsClarification.toString())
-                            Log.d("ConcAgent", questions.toString())
+                            freemiumManager.decrementTaskCount()
+                            if (clarificationAttempts < maxClarificationAttempts) {
+                                val (needsClarification, questions) = checkIfClarificationNeeded(
+                                    decision.instruction
+                                )
+                                Log.d("ConcAgent", needsClarification.toString())
+                                Log.d("ConcAgent", questions.toString())
 
-                            if (needsClarification) {
-                                clarificationAttempts++
-                                displayClarificationQuestions(questions)
-                                val questionToAsk = "I can help with that, but first: ${questions.joinToString(" and ")}"
-                                Log.d("ConvAgent", "Task needs clarification. Asking: '$questionToAsk' (Attempt $clarificationAttempts/$maxClarificationAttempts)")
-                                conversationHistory = addResponse("model", "Clarification needed for task: ${decision.instruction}", conversationHistory)
-                                speakAndThenListen(questionToAsk, false)
-                            } else {
-                                Log.d("ConvAgent", "Task is clear. Executing: ${decision.instruction}")
+                                if (needsClarification) {
+                                    clarificationAttempts++
+                                    displayClarificationQuestions(questions)
+                                    val questionToAsk =
+                                        "I can help with that, but first: ${questions.joinToString(" and ")}"
+                                    Log.d(
+                                        "ConvAgent",
+                                        "Task needs clarification. Asking: '$questionToAsk' (Attempt $clarificationAttempts/$maxClarificationAttempts)"
+                                    )
+                                    conversationHistory = addResponse(
+                                        "model",
+                                        "Clarification needed for task: ${decision.instruction}",
+                                        conversationHistory
+                                    )
+                                    speakAndThenListen(questionToAsk, false)
+                                } else {
+                                    Log.d(
+                                        "ConvAgent",
+                                        "Task is clear. Executing: ${decision.instruction}"
+                                    )
 //                                val taskIntent = Intent(this@ConversationalAgentService, AgentTaskService::class.java).apply {
 //                                    putExtra("TASK_INSTRUCTION", decision.instruction)
 //                                    putExtra("VISION_MODE", "XML")
 //                                }
-                                AgentService.start(applicationContext, decision.instruction)
+                                    AgentService.start(applicationContext, decision.instruction)
 //                                startService(taskIntent)
-                                gracefulShutdown(decision.reply)                            }
-                        } else {
-                            Log.d("ConvAgent", "Max clarification attempts reached ($maxClarificationAttempts). Proceeding with task execution.")
-//                            val taskIntent = Intent(this@ConversationalAgentService, AgentTaskService::class.java).apply {
-//                                putExtra("TASK_INSTRUCTION", decision.instruction)
-//                                putExtra("VISION_MODE", "XML")
-//                            }
-//                            startService(taskIntent)
-                            AgentService.start(applicationContext, decision.instruction)
+                                    gracefulShutdown(decision.reply)
+                                }
+                            } else {
+                                Log.d(
+                                    "ConvAgent",
+                                    "Max clarification attempts reached ($maxClarificationAttempts). Proceeding with task execution."
+                                )
+                                AgentService.start(applicationContext, decision.instruction)
 
-                            gracefulShutdown(decision.reply)
+                                gracefulShutdown(decision.reply)
+                            }
                         }
-
 
                     }
                     else -> { // Default to "Reply"
