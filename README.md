@@ -2,23 +2,16 @@
 
 **You touch grass. I'll touch your glass.**  
 [DISCORD INVITE](https://discord.gg/FhyfrZBq)  
-Apply for the internal test: [google form](https://docs.google.com/forms/d/e/1FAIpQLScgviOQ13T8Z5sYD6KOLAPex4H_St0ubWNmuRIsXweFzRVrSw/viewform?usp=dialog)
+Apply for the closed test: [google form](https://docs.google.com/forms/d/e/1FAIpQLScgviOQ13T8Z5sYD6KOLAPex4H_St0ubWNmuRIsXweFzRVrSw/viewform?usp=dialog)
 ---
 
-## Demos Panda Doing stuff for you
+# Demos:
 
+#### 5 task demo: 
 https://github.com/user-attachments/assets/cf76bb00-2bf4-4274-acad-d9f4c0d47188
 
-
-
-Demo-> Text My Brother Happy Birthday
-
+#### Text My Brother Happy Birthday
 https://github.com/user-attachments/assets/bac5726a-64b3-4cbf-b116-0ebc369bcec0
-
-
-
-
-
 
 **Panda** is a proactive, on-device AI agent for Android that autonomously understands natural language commands and operates your phone's UI to achieve them. Inspired by the need to make modern technology more accessible, Panda acts as your personal operator, capable of handling complex, multi-step tasks across different applications.
 
@@ -29,32 +22,29 @@ https://github.com/user-attachments/assets/bac5726a-64b3-4cbf-b116-0ebc369bcec0
 ## Core Capabilities
 
 * 🧠 **Intelligent UI Automation:** Panda sees the screen, understands the context of UI elements, and performs actions like tapping, swiping, and typing to navigate apps and complete tasks.
-* 🌐 **Deep Web Research:** When a task requires real-world information, Panda automatically uses the **Tavily Search API** to perform intelligent web searches, analyze the results, and use that knowledge to inform its actions.
-* 💾 **Persistent & Personalized Memory:** Powered by **Mem0**, Panda remembers key facts about you and learned procedures across sessions. It learns your preferences, contacts, and habits to become a truly personalized assistant over time.
-* 🛡️ **Proactive Content Moderation:** Define topics or types of content you wish to avoid, and Panda will actively monitor the screen and intervene to prevent that content from being shown.
+* 📢 **High Qaulity voice:** Panda have high quality voice by GCS's Chirp  
+* 💾 **Persistent & Personalized local Memory:** Panda remembers key facts about you and learned procedures across sessions. It learns your preferences, contacts, and habits to become a truly personalized assistant over time.
 
 ## Architecture Overview
 
 Panda is built on a sophisticated multi-agent system written entirely in Kotlin. This architecture separates responsibilities, allowing for more complex and reliable reasoning.
 
 * **Eyes & Hands (The Actuator):** The **Android Accessibility Service** serves as the agent's physical connection to the device, providing the low-level ability to read the screen element hierarchy and programmatically perform touch gestures.
-* **The Brain (The LLM):** All high-level reasoning, planning, and analysis are powered by **Google's Gemini** models. This is where decisions are made.
-* **The Library (Knowledge & Memory):**
-    * **Tavily Search** provides real-time web access.
-    * **Mem0** provides a persistent, long-term memory layer, allowing the agent to learn.
-* **The Agent Team:**
-    * **Manager:** The strategist. Analyzes the user's goal and memory to create a high-level plan.
-    * **Operator:** The executor. Takes a single step from the Manager's plan and determines the precise UI action.
-    * **Reflector:** The analyst. Observes the result of an action to determine success or failure, providing feedback for the next cycle.
-    * **DeepSearch Agent:** The researcher. Decides when a task requires external information and orchestrates the web search loop.
-    * **Judge:** The moderator. A specialized agent that runs the content filtering logic.
+* **The Brain (The LLM):** All high-level reasoning, planning, and analysis are powered by **LLM** models. This is where decisions are made.
+* **The Agent:**
+    * **Operator:** This is executor with Notepad.
+
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 * Android Studio (latest version recommended)
 * An Android device or emulator with API level 26+
-* API keys for Gemini, Tavily, and Mem0.
+* Some Gemini keys, sample ENV
+```
+sdk.dir=
+GEMINI_API_KEYS=
+```
 
 ### Installation
 
@@ -69,9 +59,8 @@ Panda is built on a sophisticated multi-agent system written entirely in Kotlin.
     * Create a file named `local.properties` in the root directory of the project.
     * Add your API keys to this file in the following format:
         ```properties
-        GEMINI_API_KEYS="your_gemini_key_1,your_gemini_key_2"
-        TAVILY_API_KEY="your_tavily_api_key"
-        MEM0_API_KEY="your_mem0_api_key"
+         sdk.dir=
+         GEMINI_API_KEYS=
         ```
 
 3.  **Build & Run:**
@@ -87,10 +76,7 @@ Panda is built on a sophisticated multi-agent system written entirely in Kotlin.
 
 Panda is currently a powerful proof-of-concept, and the roadmap is focused on making it a truly indispensable assistant.
 
-* [ ] **Interactive Dialogue:** Implement the ability for the agent to ask clarifying questions instead of making assumptions.
-* [ ] **Advanced Voice I/O:** Integrate a high-quality voice synthesis model like ElevenLabs for more natural and expressive interaction.
-* [ ] **Hybrid Perception Model:** Give the agent a "toolbox" of native Android APIs (e.g., using Intents to open apps directly) for faster, more reliable execution on common tasks.
-* [ ] **Advanced Multimodal Understanding:** Explore models that can understand not just screenshots, but also short video clips of screen interactions to better comprehend animations and transitions.
+* [ ] **NOT UPDATED:** List not updated
 
 ## 🤝 Contributing
 
@@ -104,10 +90,6 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 https://github.com/user-attachments/assets/b577072e-2f7f-42d2-9054-3a11160cf87d
 
 Write you api key in in local.properties, more keys you use, better is the speed 😉
-
-
-# Pull latest log file
-adb pull /data/data/com.example.blurr/files/gemini_logs/
 
 # View logs in real-time
 adb logcat | grep GeminiApi
